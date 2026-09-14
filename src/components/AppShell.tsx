@@ -3,10 +3,12 @@ import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/crm';
 import {
   LayoutDashboard,
-  Users,
-  MessageSquare,
-  Flame,
+  Send,
   Kanban,
+  MessageSquare,
+  CheckSquare,
+  Users,
+  Sliders,
   BarChart3,
   Settings,
   Building2,
@@ -17,17 +19,19 @@ import {
   LogOut,
   Menu,
   Shield,
-  Check
+  Check,
+  GraduationCap
 } from 'lucide-react';
 
 interface ShellProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onOpenTutorial?: () => void;
 }
 
-export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveTab }) => {
-  const { currentUser, setCurrentUserRole, logout, notifications, markNotificationRead } = useApp();
+export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveTab, onOpenTutorial }) => {
+  const { currentUser, setCurrentUserRole, logout, notifications, markNotificationRead, tasks } = useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -51,14 +55,17 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
   }, []);
 
   const unreadNotifications = notifications.filter(n => !n.read);
+  const pendingTasksCount = tasks.filter(t => t.status === 'PENDING').length;
 
-  // STRICT ROLE-BASED NAVIGATION FILTERING
+  // STRICT ROLE-BASED NAVIGATION WITH ALL FEATURES
   const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
-    { id: 'contacts', label: 'Contacts', icon: Users, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
-    { id: 'conversations', label: 'Conversations', icon: MessageSquare, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '4' },
-    { id: 'leadqueue', label: 'Lead Queue', icon: Flame, roles: ['ADMIN', 'MANAGER', 'AGENT'], badge: '2' },
-    { id: 'deals', label: 'Deals', icon: Kanban, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '3' },
+    { id: 'outreach', label: 'Outreach Pipeline', icon: Send, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '10' },
+    { id: 'deals', label: 'AI Deals Pipeline', icon: Kanban, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '4' },
+    { id: 'conversations', label: 'Conversations', icon: MessageSquare, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '3' },
+    { id: 'tasks', label: 'Task Manager', icon: CheckSquare, roles: ['ADMIN', 'MANAGER', 'AGENT'], badge: pendingTasksCount > 0 ? String(pendingTasksCount) : undefined },
+    { id: 'contacts', label: 'Contacts Directory', icon: Users, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
+    { id: 'templates', label: 'Templates & Automations', icon: Sliders, roles: ['ADMIN', 'MANAGER', 'AGENT'] },
     { id: 'reports', label: 'Reports & Audit', icon: BarChart3, roles: ['ADMIN', 'MANAGER', 'READ_ONLY'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['ADMIN', 'MANAGER'] },
   ];
@@ -106,12 +113,24 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
           <input
             type="text"
             placeholder="Search realtors, properties, or phone numbers..."
-            className="w-full pl-10 pr-4 py-2 bg-[#F1F6FC] border border-[#E2EAF5] rounded-xl text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:border-[#155EEF] focus:bg-white transition-all shadow-xs"
+            className="w-full pl-10 pr-4 py-2 bg-[#F1F6FC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:border-[#155EEF] focus:bg-white transition-all shadow-xs"
           />
         </div>
 
         {/* Right Header Actions */}
-        <div ref={headerActionsRef} className="flex items-center gap-3 relative">
+        <div ref={headerActionsRef} className="flex items-center gap-2.5 relative">
+
+          {/* Quick System Tutorial Button */}
+          {onOpenTutorial && (
+            <button
+              onClick={onOpenTutorial}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#BFDBFE] bg-[#EAF2FF] hover:bg-[#DBEAFE] text-[#155EEF] text-xs font-bold transition-all cursor-pointer shadow-xs"
+              title="Open Guided System Tour"
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span className="hidden sm:inline">System Tour</span>
+            </button>
+          )}
 
           {/* Quick Role Switcher Pill */}
           <div className="relative z-50">
@@ -121,7 +140,7 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                 setShowNotifications(false);
                 setShowProfileMenu(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#BFDBFE] bg-[#EAF2FF] text-[#155EEF] text-xs font-bold uppercase tracking-wider transition-all cursor-pointer hover:bg-[#DBEAFE] shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#E2EAF5] bg-[#F1F6FC] hover:bg-[#EAF2FF] text-[#0B1F3A] text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
             >
               <Shield className="w-3.5 h-3.5 text-[#155EEF]" />
               <span>ROLE: {currentUser.role.replace('_', ' ')}</span>
@@ -240,19 +259,24 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* SIDEBAR NAVIGATION */}
+        {/* SIDEBAR NAVIGATION (ULTRA LUXURY OBSIDIAN & SAPPHIRE THEME) */}
         <aside
-          className={`hidden lg:flex flex-col border-r border-[#E2EAF5] bg-white transition-all duration-300 relative z-20 ${collapsed ? 'w-20' : 'w-64'
-            }`}
+          className={`hidden lg:flex flex-col sidebar-luxury-container text-white transition-all duration-300 relative z-20 ${
+            collapsed ? 'w-20' : 'w-64'
+          }`}
         >
+          {/* Subtle Ambient Glow at top of sidebar */}
+          <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#1E40AF]/25 to-transparent pointer-events-none" />
+
+          {/* Collapse Toggle Button */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="absolute -right-3 top-6 w-6 h-6 rounded-full bg-white border border-[#E2EAF5] text-[#64748B] hover:text-[#0B1F3A] flex items-center justify-center z-30 shadow-md cursor-pointer transition-transform hover:scale-110"
+            className="absolute -right-3 top-6 w-6 h-6 rounded-full bg-[#0B1533] border border-[#1E294B] text-[#94A3B8] hover:text-white flex items-center justify-center z-30 shadow-xl cursor-pointer transition-all hover:scale-110 hover:border-[#60A5FA]"
           >
             {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
 
-          <div className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
+          <div className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto relative z-10">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -263,20 +287,20 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                   onClick={() => handleNavClick(item.id)}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold transition-all group cursor-pointer relative ${
                     isActive
-                      ? 'sidebar-item-active font-bold shadow-md shadow-[#155EEF]/25'
-                      : 'text-[#475569] sidebar-item-hover'
+                      ? 'sidebar-item-active font-bold'
+                      : 'text-[#94A3B8] sidebar-item-hover'
                   }`}
                 >
-                  {/* Subtle Active Left Indicator */}
+                  {/* Subtle Active Left Glowing Pillar */}
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#60A5FA] rounded-r-full shadow-sm" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-[#93C5FD] rounded-r-full shadow-[0_0_12px_rgba(147,197,253,0.9)]" />
                   )}
 
-                  <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-105 ${isActive ? 'text-white' : 'text-[#64748B] group-hover:text-[#0B1F3A]'}`} />
+                  <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'text-[#64748B] group-hover:text-white'}`} />
                   {!collapsed && <span className="flex-1 text-left tracking-wide">{item.label}</span>}
                   {!collapsed && item.badge && (
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      isActive ? 'bg-white/20 text-white backdrop-blur-xs' : 'bg-[#F1F6FC] text-[#64748B] border border-[#E2EAF5]'
+                      isActive ? 'bg-white/25 text-white backdrop-blur-md border border-white/30 shadow-xs' : 'bg-white/10 text-[#94A3B8] border border-white/10'
                     }`}>
                       {item.badge}
                     </span>
@@ -285,15 +309,28 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
               );
             })}
           </div>
+
+          {/* Luxury Sidebar Bottom Status Card */}
+          {!collapsed && (
+            <div className="p-3 mx-3 mb-4 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm relative z-10">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-white mb-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                <span>AI Outreach Live</span>
+              </div>
+              <div className="text-[10px] text-[#94A3B8] leading-tight">
+                5-Touch Sequence & 30-Day Nurture Active
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* MOBILE DRAWER */}
         {mobileDrawerOpen && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden flex">
-            <div className="w-72 bg-white border-r border-[#E2EAF5] p-4 flex flex-col h-full shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-[#E2EAF5]">
-                <div className="font-extrabold text-[#0B1F3A]">APEX <span className="text-[#155EEF]">ACQUIRE</span></div>
-                <button onClick={() => setMobileDrawerOpen(false)} className="text-[#64748B]">✕</button>
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-40 lg:hidden flex">
+            <div className="w-72 sidebar-luxury-container text-white p-4 flex flex-col h-full shadow-2xl">
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                <div className="font-extrabold text-white">APEX <span className="text-[#60A5FA]">ACQUIRE</span></div>
+                <button onClick={() => setMobileDrawerOpen(false)} className="text-[#94A3B8] hover:text-white">✕</button>
               </div>
               <div className="flex-1 py-4 space-y-2">
                 {visibleNavItems.map((item) => (
@@ -301,7 +338,7 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                     key={item.id}
                     onClick={() => handleNavClick(item.id)}
                     className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold ${
-                      activeTab === item.id ? 'sidebar-item-active font-bold' : 'text-[#475569] sidebar-item-hover'
+                      activeTab === item.id ? 'sidebar-item-active font-bold' : 'text-[#94A3B8] sidebar-item-hover'
                     }`}
                   >
                     <item.icon className="w-5 h-5" />

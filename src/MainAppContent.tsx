@@ -3,15 +3,18 @@ import { useApp } from './context/AppContext';
 import { LoginPage } from './components/LoginPage';
 import { AppShell } from './components/AppShell';
 import { DashboardPage } from './components/DashboardPage';
-import { ContactsPage } from './components/ContactsPage';
-import { ContactDetailDrawer } from './components/ContactDetailDrawer';
-import { ConversationsPage } from './components/ConversationsPage';
-import { LeadQueuePage } from './components/LeadQueuePage';
+import { OutreachPipelinePage } from './components/OutreachPipelinePage';
 import { DealsPage } from './components/DealsPage';
-import { DealDetailDrawer } from './components/DealDetailDrawer';
+import { TasksPage } from './components/TasksPage';
+import { ContactsPage } from './components/ContactsPage';
+import { ContactDetailPage } from './components/ContactDetailPage';
+import { ConversationsPage } from './components/ConversationsPage';
+import { TemplatesAutomationsPage } from './components/TemplatesAutomationsPage';
 import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
+import { DealDetailDrawer } from './components/DealDetailDrawer';
 import { ClickToCallModal } from './components/ClickToCallModal';
+import { SystemTutorialModal } from './components/SystemTutorialModal';
 import type { RealtorContact, PropertyDeal } from './types/crm';
 
 export const MainAppContent: React.FC = () => {
@@ -19,10 +22,11 @@ export const MainAppContent: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
-  // Selected drawer objects
+  // Selected objects
   const [selectedContact, setSelectedContact] = useState<RealtorContact | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<PropertyDeal | null>(null);
   const [callingContact, setCallingContact] = useState<RealtorContact | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Always reset active view tab to 'dashboard' when logging in
   useEffect(() => {
@@ -35,12 +39,12 @@ export const MainAppContent: React.FC = () => {
     return <LoginPage />;
   }
 
-  // Strict Navigation Access Verification Matrix
+  // Navigation Access Matrix across roles
   const allowedTabs: Record<string, string[]> = {
-    ADMIN: ['dashboard', 'contacts', 'conversations', 'leadqueue', 'deals', 'reports', 'settings'],
-    MANAGER: ['dashboard', 'contacts', 'conversations', 'leadqueue', 'deals', 'reports', 'settings'],
-    AGENT: ['dashboard', 'contacts', 'conversations', 'leadqueue', 'deals'],
-    READ_ONLY: ['dashboard', 'contacts', 'conversations', 'deals', 'reports']
+    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
+    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
+    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates'],
+    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'reports']
   };
 
   const userRole = currentUser.role;
@@ -50,6 +54,7 @@ export const MainAppContent: React.FC = () => {
   const safeActiveTab = userAllowedTabs.includes(activeTab) ? activeTab : 'dashboard';
 
   const handleNavigateWithTarget = (tab: string, convId?: string) => {
+    setSelectedContact(null); // Return from contact detail page when changing tabs
     if (userAllowedTabs.includes(tab)) {
       setActiveTab(tab);
     } else {
@@ -63,22 +68,64 @@ export const MainAppContent: React.FC = () => {
   const activeDealObj = deals.find(d => d.id === selectedDeal?.id) || selectedDeal;
 
   return (
-    <AppShell activeTab={safeActiveTab} setActiveTab={handleNavigateWithTarget}>
-      {safeActiveTab === 'dashboard' && <DashboardPage onNavigate={handleNavigateWithTarget} />}
-      {safeActiveTab === 'contacts' && <ContactsPage onSelectContact={(c) => setSelectedContact(c)} />}
-      {safeActiveTab === 'conversations' && <ConversationsPage />}
-      {safeActiveTab === 'leadqueue' && <LeadQueuePage onNavigate={handleNavigateWithTarget} />}
-      {safeActiveTab === 'deals' && <DealsPage onSelectDeal={(d) => setSelectedDeal(d)} />}
-      {safeActiveTab === 'reports' && <ReportsPage />}
-      {safeActiveTab === 'settings' && <SettingsPage />}
+    <AppShell 
+      activeTab={safeActiveTab} 
+      setActiveTab={handleNavigateWithTarget}
+      onOpenTutorial={() => setShowTutorial(true)}
+    >
+      {/* If a contact is selected, show the Dedicated Full Screen Contact Detail Page */}
+      {selectedContact ? (
+        <ContactDetailPage
+          contact={selectedContact}
+          onBack={() => setSelectedContact(null)}
+          onOpenCallModal={(c) => setCallingContact(c)}
+          onNavigateToConversation={(convId) => {
+            setSelectedContact(null);
+            handleNavigateWithTarget('conversations', convId);
+          }}
+          onSelectDeal={(d) => {
+            setSelectedContact(null);
+            setSelectedDeal(d);
+            handleNavigateWithTarget('deals');
+          }}
+        />
+      ) : (
+        <>
+          {safeActiveTab === 'dashboard' && <DashboardPage onNavigate={handleNavigateWithTarget} />}
+          
+          {safeActiveTab === 'outreach' && (
+            <OutreachPipelinePage 
+              onSelectContact={(c) => setSelectedContact(c)} 
+              onOpenCallModal={(c) => setCallingContact(c)}
+            />
+          )}
 
-      {/* DRAWERS & MODALS */}
-      <ContactDetailDrawer
-        contact={selectedContact}
-        onClose={() => setSelectedContact(null)}
-        onOpenCallModal={(c) => setCallingContact(c)}
-      />
+          {safeActiveTab === 'deals' && (
+            <DealsPage onSelectDeal={(d) => setSelectedDeal(d)} />
+          )}
 
+          {safeActiveTab === 'conversations' && (
+            <ConversationsPage onOpenCallModal={(c) => setCallingContact(c)} />
+          )}
+
+          {safeActiveTab === 'tasks' && (
+            <TasksPage onNavigate={handleNavigateWithTarget} />
+          )}
+
+          {safeActiveTab === 'contacts' && (
+            <ContactsPage 
+              onSelectContact={(c) => setSelectedContact(c)} 
+              onOpenCallModal={(c) => setCallingContact(c)}
+            />
+          )}
+
+          {safeActiveTab === 'templates' && <TemplatesAutomationsPage />}
+          {safeActiveTab === 'reports' && <ReportsPage />}
+          {safeActiveTab === 'settings' && <SettingsPage />}
+        </>
+      )}
+
+      {/* MODALS */}
       <DealDetailDrawer
         deal={activeDealObj}
         onClose={() => setSelectedDeal(null)}
@@ -91,6 +138,11 @@ export const MainAppContent: React.FC = () => {
       <ClickToCallModal
         contact={callingContact}
         onClose={() => setCallingContact(null)}
+      />
+
+      <SystemTutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
       />
     </AppShell>
   );

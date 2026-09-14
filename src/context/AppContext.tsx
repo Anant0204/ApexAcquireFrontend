@@ -1,6 +1,33 @@
 import React, { createContext, useContext, useState } from 'react';
-import type { UserProfile, UserRole, RealtorContact, Conversation, PropertyDeal, AppNotification, AuditLogItem, Grade, DealStage } from '../types/crm';
-import { MOCK_USERS, INITIAL_CONTACTS, INITIAL_CONVERSATIONS, INITIAL_DEALS, INITIAL_NOTIFICATIONS, INITIAL_AUDIT_LOGS } from '../data/mockData';
+import type { 
+  UserProfile, 
+  UserRole, 
+  RealtorContact, 
+  Conversation, 
+  PropertyDeal, 
+  AppNotification, 
+  AuditLogItem, 
+  Grade, 
+  DealStage, 
+  OutreachStage, 
+  ContactTemperature,
+  CRMTask,
+  EmailTemplate,
+  WorkflowRule,
+  AIPersonalityConfig
+} from '../types/crm';
+import { 
+  MOCK_USERS, 
+  INITIAL_CONTACTS, 
+  INITIAL_CONVERSATIONS, 
+  INITIAL_DEALS, 
+  INITIAL_TASKS,
+  INITIAL_TEMPLATES,
+  INITIAL_WORKFLOWS,
+  INITIAL_AI_CONFIG,
+  INITIAL_NOTIFICATIONS, 
+  INITIAL_AUDIT_LOGS 
+} from '../data/mockData';
 
 interface AppContextType {
   currentUser: UserProfile;
@@ -15,10 +42,14 @@ interface AppContextType {
   updateUser: (id: string, updates: Partial<UserProfile>) => void;
   toggleUserStatus: (id: string) => void;
 
-  // Contacts State & Actions (CRUD + Soft Delete)
+  // Contacts State & Actions
   contacts: RealtorContact[];
   addContact: (contact: Omit<RealtorContact, 'id'>) => void;
   updateContact: (id: string, updates: Partial<RealtorContact>) => void;
+  updateContactStage: (id: string, newStage: OutreachStage) => void;
+  updateContactTemperature: (id: string, temp: ContactTemperature) => void;
+  recycleContactToQueued: (id: string) => void;
+  advanceContactSequence: (id: string) => void;
   archiveContact: (id: string) => void;
   bulkUpdateContacts: (ids: string[], updates: Partial<RealtorContact>) => void;
   importContacts: (newContacts: Omit<RealtorContact, 'id'>[]) => void;
@@ -30,8 +61,10 @@ interface AppContextType {
   sendMessage: (conversationId: string, text: string) => void;
   toggleAiTakeover: (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => void;
   overrideGrade: (conversationId: string, newGrade: Grade, newScore: number, reason: string) => void;
+  updateConversationTemperature: (conversationId: string, temp: ContactTemperature) => void;
+  cloneLeadToDeals: (conversationId: string) => void;
 
-  // Deals State & Actions (CRUD)
+  // Deals State & Actions (Multi-deal support)
   deals: PropertyDeal[];
   activeDealId: string | null;
   setActiveDealId: (id: string | null) => void;
@@ -42,13 +75,34 @@ interface AppContextType {
   addGeneratedContract: (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string }) => void;
   claimLead: (conversationId: string, assignedUserId?: string, assignedUserName?: string) => void;
 
+  // Tasks State & Actions
+  tasks: CRMTask[];
+  addTask: (task: Omit<CRMTask, 'id' | 'createdAt'>) => void;
+  updateTask: (taskId: string, updates: Partial<CRMTask>) => void;
+  completeTask: (taskId: string) => void;
+  deleteTask: (taskId: string) => void;
+
+  // Phone Call AI-Stop Safeguard Action
+  handlePhoneCallInitiated: (contactId: string, contactName: string) => void;
+
+  // Templates & Workflows State & Actions
+  templates: EmailTemplate[];
+  addTemplate: (template: Omit<EmailTemplate, 'id' | 'lastUpdated'>) => void;
+  updateTemplate: (id: string, updates: Partial<EmailTemplate>) => void;
+  deleteTemplate: (id: string) => void;
+  workflows: WorkflowRule[];
+  toggleWorkflow: (id: string) => void;
+  simulateWorkflow: (id: string) => void;
+  aiConfig: AIPersonalityConfig;
+  updateAIConfig: (updates: Partial<AIPersonalityConfig>) => void;
+
   // Notifications & Audit Logs
   notifications: AppNotification[];
   markNotificationRead: (id: string) => void;
   auditLogs: AuditLogItem[];
   logAuditAction: (action: string, affectedRecord: string) => void;
 
-  // Settings & Rules State
+  // Settings
   settings: {
     cadenceIntervalDays: number;
     sendingHoursStart: string;
@@ -75,6 +129,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [deals, setDeals] = useState<PropertyDeal[]>(INITIAL_DEALS);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
 
+  const [tasks, setTasks] = useState<CRMTask[]>(INITIAL_TASKS);
+  const [templates, setTemplates] = useState<EmailTemplate[]>(INITIAL_TEMPLATES);
+  const [workflows, setWorkflows] = useState<WorkflowRule[]>(INITIAL_WORKFLOWS);
+  const [aiConfig, setAiConfig] = useState<AIPersonalityConfig>(INITIAL_AI_CONFIG);
+
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
 
@@ -82,7 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cadenceIntervalDays: 3,
     sendingHoursStart: '08:00',
     sendingHoursEnd: '18:00',
-    aiInstructions: 'Identify whether the realtor has an off-market property. Collect address, asking price, condition, and closing timeline. Keep messages professional, concise, and helpful.',
+    aiInstructions: INITIAL_AI_CONFIG.systemInstructions,
     aiMaxConsecutiveReplies: 4,
     globalAiEnabled: true,
     gradeWeights: { response: 25, address: 35, price: 20, timeline: 20 }
@@ -138,6 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Toggled user activation status`, `User #${id}`);
   };
 
+  // Contacts Handlers
   const addContact = (contactData: Omit<RealtorContact, 'id'>) => {
     const newId = `cnt-${Date.now()}`;
     const newContact: RealtorContact = { ...contactData, id: newId };
@@ -147,11 +207,126 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateContact = (id: string, updates: Partial<RealtorContact>) => {
     setContacts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-    logAuditAction(`Updated contact details for ID ${id}`, `Contact #${id}`);
+    logAuditAction(`Updated contact details`, `Contact #${id}`);
+  };
+
+  const updateContactStage = (id: string, newStage: OutreachStage) => {
+    const contact = contacts.find(c => c.id === id);
+    if (!contact) return;
+
+    setContacts(prev => prev.map(c => {
+      if (c.id === id) {
+        return {
+          ...c,
+          status: newStage,
+          outreachStage: newStage
+        };
+      }
+      return c;
+    }));
+
+    // Auto Task Trigger 1: Needs Human Touch
+    if (newStage === 'Needs Human Touch') {
+      const task: CRMTask = {
+        id: `tsk-${Date.now()}`,
+        title: `Needs Human Touch: Follow up with ${contact.name}`,
+        description: `Bot paused. Realtor requires personal takeover regarding off-market inquiry.`,
+        type: 'human_touch',
+        priority: 'HIGH',
+        status: 'PENDING',
+        assignedToId: contact.ownerId || currentUser.id,
+        assignedToName: contact.ownerName || currentUser.name,
+        dueDate: 'Today',
+        relatedContactId: contact.id,
+        relatedContactName: contact.name,
+        createdAt: 'Just now'
+      };
+      setTasks(prev => [task, ...prev]);
+
+      // Switch matching conversation to Human Takeover
+      setConversations(prev => prev.map(conv => conv.contactId === id ? { ...conv, aiStatus: 'Human Takeover', status: 'Needs Human', outreachStage: 'Needs Human Touch' } : conv));
+    }
+
+    // Auto Task Trigger 2: Lead Created
+    if (newStage === 'Lead Created') {
+      const task: CRMTask = {
+        id: `tsk-${Date.now()}`,
+        title: `Lead Created: Underwrite & Send LOI for ${contact.name}`,
+        description: `Property opportunity captured. Underwriting and acquisition review required.`,
+        type: 'lead_created',
+        priority: 'HIGH',
+        status: 'PENDING',
+        assignedToId: contact.ownerId || currentUser.id,
+        assignedToName: contact.ownerName || currentUser.name,
+        dueDate: 'Today',
+        relatedContactId: contact.id,
+        relatedContactName: contact.name,
+        createdAt: 'Just now'
+      };
+      setTasks(prev => [task, ...prev]);
+    }
+
+    logAuditAction(`Moved contact outreach stage to "${newStage}"`, `Contact #${id}`);
+  };
+
+  const updateContactTemperature = (id: string, temp: ContactTemperature) => {
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, temperature: temp } : c));
+    setConversations(prev => prev.map(conv => conv.contactId === id ? { ...conv, temperature: temp } : conv));
+    logAuditAction(`Updated contact temperature to "${temp}"`, `Contact #${id}`);
+  };
+
+  // 30-Day Nurture Recycle Mechanism
+  const recycleContactToQueued = (id: string) => {
+    setContacts(prev => prev.map(c => {
+      if (c.id === id) {
+        const nextRecycleCount = (c.sequenceInfo.recycleCount || 0) + 1;
+        return {
+          ...c,
+          status: 'Queued for Outreach' as OutreachStage,
+          outreachStage: 'Queued for Outreach' as OutreachStage,
+          temperature: 'Cold' as ContactTemperature,
+          sequenceInfo: {
+            ...c.sequenceInfo,
+            currentTouch: 0,
+            nurtureDay: 0,
+            recycleCount: nextRecycleCount,
+            lastTouchDate: 'Recycled Today',
+            nextScheduledTouch: 'Touch 1 Ready'
+          }
+        };
+      }
+      return c;
+    }));
+
+    logAuditAction(`Recycled contact from 30-Day Nurture back to Queued for Outreach`, `Contact #${id}`);
+  };
+
+  const advanceContactSequence = (id: string) => {
+    setContacts(prev => prev.map(c => {
+      if (c.id === id) {
+        const current = c.sequenceInfo.currentTouch;
+        const next = current < 5 ? current + 1 : 5;
+        const nextStage: OutreachStage = next === 5 ? 'No Response, In 30-Day Nurture' : 'Outreach Sent';
+        return {
+          ...c,
+          status: nextStage,
+          outreachStage: nextStage,
+          sequenceInfo: {
+            ...c.sequenceInfo,
+            currentTouch: next,
+            lastTouchDate: 'Just now',
+            nextScheduledTouch: next === 5 ? 'In 30-Day Nurture Loop' : `Touch ${next + 1} in 2 days`
+          }
+        };
+      }
+      return c;
+    }));
+
+    logAuditAction(`Advanced 5-Touch sequence for contact`, `Contact #${id}`);
   };
 
   const archiveContact = (id: string) => {
-    setContacts(prev => prev.map(c => c.id === id ? { ...c, isArchived: true, status: 'Archived' } : c));
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, isArchived: true, status: 'Not Interested - CLOSED' } : c));
     logAuditAction(`Soft-deleted (archived) contact`, `Contact #${id}`);
   };
 
@@ -169,6 +344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Imported ${created.length} contacts via CSV`, 'CSV Import Wizard');
   };
 
+  // Conversations Handlers
   const sendMessage = (conversationId: string, text: string) => {
     setConversations(prev => prev.map(conv => {
       if (conv.id === conversationId) {
@@ -193,7 +369,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleAiTakeover = (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
-    setConversations(prev => prev.map(conv => conv.id === conversationId ? { ...conv, aiStatus } : conv));
+    setConversations(prev => prev.map(conv => {
+      if (conv.id === conversationId) {
+        const nextStage: OutreachStage = aiStatus === 'Human Takeover' ? 'Needs Human Touch' : conv.outreachStage;
+        return {
+          ...conv,
+          aiStatus,
+          outreachStage: nextStage
+        };
+      }
+      return conv;
+    }));
+
     logAuditAction(`Changed AI status to ${aiStatus}`, `Conversation #${conversationId}`);
   };
 
@@ -207,6 +394,98 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Manually overridden grade to ${newGrade} (${newScore})`, `Conversation #${conversationId}`);
   };
 
+  const updateConversationTemperature = (conversationId: string, temp: ContactTemperature) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv) return;
+
+    setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, temperature: temp } : c));
+    if (conv.contactId) {
+      setContacts(prev => prev.map(cnt => cnt.id === conv.contactId ? { ...cnt, temperature: temp } : cnt));
+    }
+    logAuditAction(`Updated conversation temperature to ${temp}`, `Conversation #${conversationId}`);
+  };
+
+  const cloneLeadToDeals = (conversationId: string) => {
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv || !conv.propertyCaptured) return;
+
+    const newDeal: PropertyDeal = {
+      id: `dl-${Date.now()}`,
+      conversationId: conv.id,
+      contactId: conv.contactId,
+      address: conv.propertyCaptured.address,
+      city: conv.propertyCaptured.city || 'Dallas',
+      state: conv.propertyCaptured.state || 'TX',
+      zip: conv.propertyCaptured.zip || '75201',
+      askingPrice: conv.propertyCaptured.askingPrice || 500000,
+      beds: conv.propertyCaptured.beds || 3,
+      baths: conv.propertyCaptured.baths || 2,
+      sqft: conv.propertyCaptured.sqft || 2000,
+      yearBuilt: 2000,
+      propertyType: 'Single Family Residence',
+      stage: 'New Property',
+      isAiInbound: true,
+      ownerId: conv.assignedOwnerId || currentUser.id,
+      ownerName: conv.assignedOwnerName || currentUser.name,
+      grade: conv.grade,
+      score: conv.score,
+      temperature: conv.temperature || 'Hot',
+      realtorName: conv.realtorName,
+      realtorBrokerage: conv.brokerage,
+      realtorPhone: conv.realtorPhone,
+      realtorEmail: conv.realtorEmail,
+      createdAt: 'Just now',
+      updatedAt: 'Just now',
+      source: 'AI Outreach Capture',
+      underwriting: {
+        arv: Math.round((conv.propertyCaptured.askingPrice || 500000) * 1.25),
+        estimatedRehab: 45000,
+        targetWholesaleFee: 25000,
+        calculatedMao: Math.round((conv.propertyCaptured.askingPrice || 500000) * 0.95)
+      }
+    };
+
+    setDeals(prev => [newDeal, ...prev]);
+
+    // Link deal ID to contact
+    if (conv.contactId) {
+      setContacts(prev => prev.map(cnt => {
+        if (cnt.id === conv.contactId) {
+          const existing = cnt.propertyDealIds || [];
+          return {
+            ...cnt,
+            status: 'Lead Created',
+            outreachStage: 'Lead Created',
+            propertyDealIds: [...existing, newDeal.id]
+          };
+        }
+        return cnt;
+      }));
+    }
+
+    // Add task
+    const task: CRMTask = {
+      id: `tsk-${Date.now()}`,
+      title: `Lead Cloned: Underwrite ${newDeal.address}`,
+      description: `Opportunity cloned into AI Deals. Review MAO and draft LOI.`,
+      type: 'lead_created',
+      priority: 'HIGH',
+      status: 'PENDING',
+      assignedToId: newDeal.ownerId,
+      assignedToName: newDeal.ownerName,
+      dueDate: 'Today',
+      relatedContactId: conv.contactId,
+      relatedContactName: conv.realtorName,
+      relatedDealId: newDeal.id,
+      relatedDealAddress: newDeal.address,
+      createdAt: 'Just now'
+    };
+    setTasks(prev => [task, ...prev]);
+
+    logAuditAction(`Cloned property lead ${newDeal.address} into AI Deals`, `Deal #${newDeal.id}`);
+  };
+
+  // Deals Handlers
   const addDeal = (dealData: Omit<PropertyDeal, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newDeal: PropertyDeal = {
       ...dealData,
@@ -215,11 +494,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: 'Just now'
     };
     setDeals(prev => [newDeal, ...prev]);
+
+    // Link to contact if exists
+    if (newDeal.contactId) {
+      setContacts(prev => prev.map(c => {
+        if (c.id === newDeal.contactId) {
+          const existing = c.propertyDealIds || [];
+          return { ...c, propertyDealIds: [...existing, newDeal.id] };
+        }
+        return c;
+      }));
+    }
+
     logAuditAction(`Manually created deal for ${newDeal.address}`, `Deal #${newDeal.id}`);
   };
 
   const updateDealStage = (dealId: string, newStage: DealStage) => {
+    const deal = deals.find(d => d.id === dealId);
+    if (!deal) return;
+
     setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage: newStage, updatedAt: 'Just now' } : d));
+
+    // Auto Task Trigger on "Need Help" Deal Stage
+    if (newStage === 'Need Help') {
+      const managerUser = users.find(u => u.role === 'MANAGER') || users[0];
+      const managerTask: CRMTask = {
+        id: `tsk-${Date.now()}`,
+        title: `Manager Escalation: ${deal.address} Needs Help`,
+        description: `Deal moved to "Need Help" stage. Requires manager review, price concession, or terms approval.`,
+        type: 'need_help',
+        priority: 'URGENT',
+        status: 'PENDING',
+        assignedToId: managerUser.id,
+        assignedToName: managerUser.name,
+        dueDate: 'Today (Urgent)',
+        relatedContactId: deal.contactId,
+        relatedContactName: deal.realtorName,
+        relatedDealId: deal.id,
+        relatedDealAddress: deal.address,
+        createdAt: 'Just now'
+      };
+      setTasks(prev => [managerTask, ...prev]);
+
+      // Send app notification
+      const notif: AppNotification = {
+        id: `nt-${Date.now()}`,
+        title: 'Deal Escalation: Need Help',
+        message: `${deal.address} moved to Need Help. Manager task created.`,
+        type: 'task_created',
+        timestamp: 'Just now',
+        read: false,
+        targetPath: 'tasks'
+      };
+      setNotifications(prev => [notif, ...prev]);
+    }
+
     logAuditAction(`Moved deal stage to ${newStage}`, `Deal #${dealId}`);
   };
 
@@ -229,7 +558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const archiveDeal = (dealId: string) => {
-    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, isArchived: true, stage: 'Trash' } : d));
+    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, isArchived: true, stage: 'TRASH' } : d));
     logAuditAction(`Soft-deleted (archived) deal`, `Deal #${dealId}`);
   };
 
@@ -263,7 +592,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const conv = conversations.find(c => c.id === conversationId);
     if (!conv) return;
 
-    // Update conversation assignedOwner, status to Assigned, and switch AI to Human Takeover
     setConversations(prev => prev.map(c => {
       if (c.id === conversationId) {
         return {
@@ -277,7 +605,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     }));
 
-    // Update Realtor Contact owner if matching contact exists
     if (conv.contactId) {
       setContacts(prev => prev.map(cnt => {
         if (cnt.id === conv.contactId) {
@@ -285,7 +612,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...cnt,
             ownerId: targetUserId,
             ownerName: targetUserName,
-            status: 'Engaged'
+            status: 'Needs Human Touch'
           };
         }
         return cnt;
@@ -293,6 +620,135 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     logAuditAction(`Claimed lead (assigned to ${targetUserName})`, `Conversation #${conversationId}`);
+  };
+
+  // Tasks Management Handlers
+  const addTask = (taskData: Omit<CRMTask, 'id' | 'createdAt'>) => {
+    const newTask: CRMTask = {
+      ...taskData,
+      id: `tsk-${Date.now()}`,
+      createdAt: 'Just now'
+    };
+    setTasks(prev => [newTask, ...prev]);
+    logAuditAction(`Created new task: ${newTask.title}`, `Task #${newTask.id}`);
+  };
+
+  const updateTask = (taskId: string, updates: Partial<CRMTask>) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+    logAuditAction(`Updated task`, `Task #${taskId}`);
+  };
+
+  const completeTask = (taskId: string) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          status: 'COMPLETED',
+          completedAt: 'Just now'
+        };
+      }
+      return t;
+    }));
+    logAuditAction(`Marked task as completed`, `Task #${taskId}`);
+  };
+
+  const deleteTask = (taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    logAuditAction(`Deleted task`, `Task #${taskId}`);
+  };
+
+  // Phone Call AI-Stop Safeguard Action
+  const handlePhoneCallInitiated = (contactId: string, contactName: string) => {
+    // 1. Immediately pause AI bot and update stage to "Needs Human Touch"
+    setContacts(prev => prev.map(c => {
+      if (c.id === contactId) {
+        return {
+          ...c,
+          status: 'Needs Human Touch',
+          outreachStage: 'Needs Human Touch'
+        };
+      }
+      return c;
+    }));
+
+    // 2. Switch any matching conversation to Human Takeover
+    setConversations(prev => prev.map(c => {
+      if (c.contactId === contactId) {
+        return {
+          ...c,
+          aiStatus: 'Human Takeover',
+          status: 'Needs Human',
+          outreachStage: 'Needs Human Touch'
+        };
+      }
+      return c;
+    }));
+
+    // 3. Create follow-up task
+    const newTask: CRMTask = {
+      id: `tsk-${Date.now()}`,
+      title: `Phone Call Follow-Up: ${contactName}`,
+      description: `Live phone call was conducted. AI SMS was paused automatically. Log call notes and send follow-up terms.`,
+      type: 'phone_call',
+      priority: 'HIGH',
+      status: 'PENDING',
+      assignedToId: currentUser.id,
+      assignedToName: currentUser.name,
+      dueDate: 'Today',
+      relatedContactId: contactId,
+      relatedContactName: contactName,
+      createdAt: 'Just now'
+    };
+    setTasks(prev => [newTask, ...prev]);
+
+    logAuditAction(`Phone call initiated — AI bot paused & "Needs Human Touch" task created`, `Contact #${contactId}`);
+  };
+
+  // Templates Handlers
+  const addTemplate = (templateData: Omit<EmailTemplate, 'id' | 'lastUpdated'>) => {
+    const newTemplate: EmailTemplate = {
+      ...templateData,
+      id: `tpl-${Date.now()}`,
+      lastUpdated: 'Just now'
+    };
+    setTemplates(prev => [newTemplate, ...prev]);
+    logAuditAction(`Added template: ${newTemplate.name}`, `Template #${newTemplate.id}`);
+  };
+
+  const updateTemplate = (id: string, updates: Partial<EmailTemplate>) => {
+    setTemplates(prev => prev.map(t => t.id === id ? { ...t, ...updates, lastUpdated: 'Just now' } : t));
+    logAuditAction(`Updated template`, `Template #${id}`);
+  };
+
+  const deleteTemplate = (id: string) => {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+    logAuditAction(`Deleted template`, `Template #${id}`);
+  };
+
+  // Workflows Handlers
+  const toggleWorkflow = (id: string) => {
+    setWorkflows(prev => prev.map(w => w.id === id ? { ...w, isActive: !w.isActive } : w));
+    logAuditAction(`Toggled automation workflow active state`, `Workflow #${id}`);
+  };
+
+  const simulateWorkflow = (id: string) => {
+    setWorkflows(prev => prev.map(w => {
+      if (w.id === id) {
+        return {
+          ...w,
+          executionCount: w.executionCount + 1,
+          lastExecuted: 'Just now (Simulated)'
+        };
+      }
+      return w;
+    }));
+
+    logAuditAction(`Simulated workflow execution successfully`, `Workflow #${id}`);
+  };
+
+  const updateAIConfig = (updates: Partial<AIPersonalityConfig>) => {
+    setAiConfig(prev => ({ ...prev, ...updates }));
+    logAuditAction(`Updated AI Agent Personality & Instructions`, 'AI Personality Studio');
   };
 
   const markNotificationRead = (id: string) => {
@@ -329,6 +785,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       contacts,
       addContact,
       updateContact,
+      updateContactStage,
+      updateContactTemperature,
+      recycleContactToQueued,
+      advanceContactSequence,
       archiveContact,
       bulkUpdateContacts,
       importContacts,
@@ -338,6 +798,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sendMessage,
       toggleAiTakeover,
       overrideGrade,
+      updateConversationTemperature,
+      cloneLeadToDeals,
       deals,
       activeDealId,
       setActiveDealId,
@@ -347,6 +809,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       archiveDeal,
       addGeneratedContract,
       claimLead,
+      tasks,
+      addTask,
+      updateTask,
+      completeTask,
+      deleteTask,
+      handlePhoneCallInitiated,
+      templates,
+      addTemplate,
+      updateTemplate,
+      deleteTemplate,
+      workflows,
+      toggleWorkflow,
+      simulateWorkflow,
+      aiConfig,
+      updateAIConfig,
       notifications,
       markNotificationRead,
       auditLogs,

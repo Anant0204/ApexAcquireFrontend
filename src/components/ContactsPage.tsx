@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import type { RealtorContact, ContactStatus, Grade } from '../types/crm';
+import type { RealtorContact, OutreachStage, ContactTemperature, Grade } from '../types/crm';
 import {
   Users,
   Upload,
@@ -13,19 +13,45 @@ import {
   X,
   AlertTriangle,
   Phone,
-  Mail
+  Mail,
+  Building,
+  RotateCcw
 } from 'lucide-react';
 
 interface ContactsProps {
   onSelectContact: (contact: RealtorContact) => void;
+  onOpenCallModal?: (contact: RealtorContact) => void;
 }
 
-export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
-  const { contacts, addContact, updateContact, archiveContact, bulkUpdateContacts, importContacts, currentUser } = useApp();
+const OUTREACH_STAGES_LIST: OutreachStage[] = [
+  'Queued for Outreach',
+  'Outreach Sent',
+  'Responded/Qualifying',
+  'Needs Human Touch',
+  'Lead Created',
+  'No Response, In 30-Day Nurture',
+  'Not Interested - CLOSED',
+  'Wrong Number / Not an Agent - CLOSED',
+  'Opted Out / DND - CLOSED',
+  'SMS Error - CLOSED'
+];
+
+export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenCallModal }) => {
+  const { 
+    contacts, 
+    addContact, 
+    updateContact, 
+    updateContactTemperature, 
+    updateContactStage, 
+    archiveContact, 
+    bulkUpdateContacts, 
+    importContacts, 
+    currentUser 
+  } = useApp();
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [gradeFilter, setGradeFilter] = useState<string>('ALL');
+  const [stageFilter, setStageFilter] = useState<string>('ALL');
+  const [temperatureFilter, setTemperatureFilter] = useState<string>('ALL');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Modals state
@@ -42,12 +68,24 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
     email: '',
     phone: '',
     market: 'Dallas Metro',
-    status: 'Active in Outreach' as ContactStatus,
+    status: 'Queued for Outreach' as OutreachStage,
+    outreachStage: 'Queued for Outreach' as OutreachStage,
+    temperature: 'Warm' as ContactTemperature,
     ownerId: currentUser.id,
     ownerName: currentUser.name,
     tags: ['Realtor Directory'],
     grade: 'B' as Grade,
-    score: 75
+    score: 75,
+    sequenceInfo: {
+      currentTouch: 0,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: 'Never',
+      nextScheduledTouch: 'Touch 1 Ready',
+      channel: 'sms' as const
+    },
+    propertyDealIds: []
   });
 
   const activeContacts = contacts.filter(c => !c.isArchived);
@@ -58,10 +96,10 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
       c.email.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search);
 
-    const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
-    const matchesGrade = gradeFilter === 'ALL' || c.grade === gradeFilter;
+    const matchesStage = stageFilter === 'ALL' || c.outreachStage === stageFilter;
+    const matchesTemp = temperatureFilter === 'ALL' || c.temperature === temperatureFilter;
 
-    return matchesSearch && matchesStatus && matchesGrade;
+    return matchesSearch && matchesStage && matchesTemp;
   });
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,21 +134,28 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
   const isManager = currentUser.role === 'MANAGER';
   const canCreate = isAdmin || isManager;
   const canBulk = isAdmin || isManager;
+  const isReadOnly = currentUser.role === 'READ_ONLY';
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-full pb-12">
 
       {/* Header & Main CTAs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] flex items-center gap-2">
-            Realtor Directory
-            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE]">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE] uppercase">
+              Realtor Master Database
+            </span>
+            <span className="text-xs text-[#64748B]">&bull; 10 Outreach Stages &bull; Temperature Custom Field</span>
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] flex items-center gap-2">
+            Realtor Contacts Directory
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#155EEF] text-white">
               {activeContacts.length} Active
             </span>
           </h1>
           <p className="text-xs text-[#64748B] mt-1">
-            Manage licensed realtors across DFW markets, campaign enrollment, and interaction grades.
+            Manage licensed realtors across DFW, outreach sequence progress, Hot/Warm/Cold temperature grading, and linked property deals.
           </p>
         </div>
 
@@ -135,12 +180,24 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                   email: '',
                   phone: '',
                   market: 'Dallas Metro',
-                  status: 'Active in Outreach',
+                  status: 'Queued for Outreach',
+                  outreachStage: 'Queued for Outreach',
+                  temperature: 'Warm',
                   ownerId: currentUser.id,
                   ownerName: currentUser.name,
                   tags: ['Realtor Directory'],
                   grade: 'B',
-                  score: 75
+                  score: 75,
+                  sequenceInfo: {
+                    currentTouch: 0,
+                    totalTouches: 5,
+                    nurtureDay: 0,
+                    recycleCount: 0,
+                    lastTouchDate: 'Never',
+                    nextScheduledTouch: 'Touch 1 Ready',
+                    channel: 'sms'
+                  },
+                  propertyDealIds: []
                 });
                 setShowAddModal(true);
               }}
@@ -153,86 +210,84 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
       </div>
 
       {/* FILTER & SEARCH TOOLBAR */}
-      <div className="executive-panel rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="executive-panel rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3.5 top-3" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, brokerage, email..."
-            className="w-full pl-10 pr-4 py-2 bg-[#F5F8FC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:border-[#155EEF] focus:bg-white transition-all"
+            placeholder="Search name, brokerage, phone..."
+            className="w-full pl-10 pr-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:border-[#155EEF]"
           />
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto">
+          {/* Stage Filter */}
           <div className="flex items-center gap-1.5 text-xs text-[#475569]">
-            <Filter className="w-3.5 h-3.5" /> Status:
+            <Filter className="w-3.5 h-3.5" /> Stage:
           </div>
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#F5F8FC] border border-[#E2E8F0] text-[#0F172A] text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-[#155EEF]"
+            value={stageFilter}
+            onChange={(e) => setStageFilter(e.target.value)}
+            className="bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A] text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-[#155EEF]"
           >
-            <option value="ALL">All Statuses</option>
-            <option value="Active in Outreach">Active in Outreach</option>
-            <option value="Responded">Responded</option>
-            <option value="Escalated">Escalated</option>
-            <option value="Declined">Declined</option>
-            <option value="Opted Out">Opted Out</option>
-            <option value="Do Not Contact">Do Not Contact</option>
+            <option value="ALL">All 10 Stages</option>
+            {OUTREACH_STAGES_LIST.map(st => (
+              <option key={st} value={st}>{st}</option>
+            ))}
           </select>
 
-          <div className="flex items-center gap-1.5 text-xs text-[#475569] ml-2">Grade:</div>
+          {/* Temperature Filter */}
+          <div className="flex items-center gap-1.5 text-xs text-[#475569] ml-2">Temp:</div>
           <select
-            value={gradeFilter}
-            onChange={(e) => setGradeFilter(e.target.value)}
-            className="bg-[#F5F8FC] border border-[#E2E8F0] text-[#0F172A] text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-[#155EEF]"
+            value={temperatureFilter}
+            onChange={(e) => setTemperatureFilter(e.target.value)}
+            className="bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A] text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-[#155EEF]"
           >
-            <option value="ALL">All Grades</option>
-            <option value="A">Grade A (90+)</option>
-            <option value="B">Grade B (75-89)</option>
-            <option value="C">Grade C (50-74)</option>
-            <option value="D">Grade D (&lt;50)</option>
+            <option value="ALL">All Temps</option>
+            <option value="Hot">🔥 Hot</option>
+            <option value="Warm">⚡ Warm</option>
+            <option value="Cold">❄️ Cold</option>
           </select>
         </div>
       </div>
 
       {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && canBulk && (
-        <div className="p-3 rounded-xl bg-[#EAF2FF] border border-[#BFDBFE] flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-[#EAF2FF] border border-[#BFDBFE] flex items-center justify-between shadow-xs">
           <div className="text-xs text-[#155EEF] font-bold">
             {selectedIds.length} Realtors Selected
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                bulkUpdateContacts(selectedIds, { status: 'Active in Outreach' });
+                bulkUpdateContacts(selectedIds, { status: 'Queued for Outreach', outreachStage: 'Queued for Outreach' });
                 setSelectedIds([]);
               }}
               className="px-3 py-1.5 rounded-lg btn-executive-primary text-white text-xs font-bold cursor-pointer"
             >
-              Enroll in Cadence
+              Enroll in 5-Touch Cadence
             </button>
             <button
               onClick={() => {
-                bulkUpdateContacts(selectedIds, { status: 'Do Not Contact' });
+                bulkUpdateContacts(selectedIds, { status: 'Opted Out / DND - CLOSED', outreachStage: 'Opted Out / DND - CLOSED' });
                 setSelectedIds([]);
               }}
               className="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50 text-xs font-semibold"
             >
-              Set Do Not Contact
+              Set DND / Opt Out
             </button>
           </div>
         </div>
       )}
 
       {/* REALTOR CONTACTS TABLE */}
-      <div className="executive-panel rounded-2xl overflow-hidden shadow-xs">
+      <div className="executive-panel rounded-2xl overflow-hidden shadow-xs border border-[#E2E8F0]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-[#E2E8F0] text-[#64748B] uppercase tracking-wider text-[10px] bg-[#F5F8FC]">
+              <tr className="border-b border-[#E2E8F0] text-[#64748B] uppercase tracking-wider text-[10px] bg-[#F8FAFC]">
                 {canBulk && (
                   <th className="py-3 px-4 w-10">
                     <input
@@ -244,16 +299,17 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                 )}
                 <th className="py-3 px-4">Realtor Name & Brokerage</th>
                 <th className="py-3 px-4">Contact Info</th>
-                <th className="py-3 px-4">Market Region</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Grade</th>
+                <th className="py-3 px-4">Outreach Stage</th>
+                <th className="py-3 px-4">Temp</th>
+                <th className="py-3 px-4">Sequence / Nurture</th>
+                <th className="py-3 px-4">Linked Deals</th>
                 <th className="py-3 px-4">Owner</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0] text-[#0F172A]">
               {filteredContacts.map((c) => (
-                <tr key={c.id} className="hover:bg-[#EAF2FF]/50 transition-colors group">
+                <tr key={c.id} className="hover:bg-[#F8FAFC] transition-colors group">
                   {canBulk && (
                     <td className="py-3.5 px-4">
                       <input
@@ -275,44 +331,86 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                     <div className="text-[#475569] flex items-center gap-1.5">
                       <Mail className="w-3 h-3 text-[#64748B]" /> {c.email}
                     </div>
-                    <div className="text-[#64748B] text-[11px] flex items-center gap-1.5 mt-0.5">
+                    <div className="text-[#64748B] text-[11px] flex items-center gap-1.5 mt-0.5 font-mono">
                       <Phone className="w-3 h-3 text-[#64748B]" /> {c.phone}
                     </div>
                   </td>
 
-                  <td className="py-3.5 px-4 text-[#475569]">{c.market}</td>
-
                   <td className="py-3.5 px-4">
-                    <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${c.status === 'Responded' ? 'bg-[#16A34A]/10 text-[#16A34A] border border-[#16A34A]/30' :
-                      c.status === 'Active in Outreach' ? 'bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE]' :
-                        c.status === 'Escalated' ? 'bg-[#155EEF] text-white shadow-xs' :
-                          c.status === 'Declined' ? 'bg-[#F5F8FC] text-[#475569] border border-[#E2E8F0]' :
-                            'bg-[#E11D48]/10 text-[#E11D48] border border-[#E11D48]/30'
-                      }`}>
-                      {c.status}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      c.outreachStage === 'Lead Created' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      c.outreachStage === 'Needs Human Touch' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+                      c.outreachStage === 'Responded/Qualifying' ? 'bg-teal-50 text-teal-800 border border-teal-200' :
+                      c.outreachStage === 'Outreach Sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                      c.outreachStage === 'No Response, In 30-Day Nurture' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                      'bg-slate-100 text-slate-700'
+                    }`}>
+                      {c.outreachStage}
                     </span>
                   </td>
 
+                  {/* Temperature Dropdown (Inline edit) */}
                   <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center border ${c.grade === 'A' ? 'bg-[#16A34A]/10 text-[#16A34A] border-[#16A34A]/30' :
-                        c.grade === 'B' ? 'bg-[#EAF2FF] text-[#155EEF] border-[#BFDBFE]' :
-                          c.grade === 'C' ? 'bg-[#F5F8FC] text-[#2563EB] border-[#E2E8F0]' :
-                            'bg-[#E11D48]/10 text-[#E11D48] border-[#E11D48]/30'
-                        }`}>
-                        {c.grade}
+                    <select
+                      value={c.temperature}
+                      disabled={isReadOnly}
+                      onChange={(e) => updateContactTemperature(c.id, e.target.value as ContactTemperature)}
+                      className={`text-[10px] font-extrabold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none ${
+                        c.temperature === 'Hot' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                        c.temperature === 'Warm' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}
+                    >
+                      <option value="Hot">🔥 Hot</option>
+                      <option value="Warm">⚡ Warm</option>
+                      <option value="Cold">❄️ Cold</option>
+                    </select>
+                  </td>
+
+                  {/* Sequence Progress */}
+                  <td className="py-3.5 px-4">
+                    {c.outreachStage === 'Outreach Sent' && (
+                      <span className="px-2 py-0.5 bg-[#EAF2FF] text-[#155EEF] font-bold text-[10px] rounded-lg">
+                        Touch {c.sequenceInfo.currentTouch}/5
                       </span>
-                      <span className="font-mono text-[#64748B] text-[11px]">{c.score}</span>
-                    </div>
+                    )}
+                    {c.outreachStage === 'No Response, In 30-Day Nurture' && (
+                      <span className="px-2 py-0.5 bg-purple-50 text-purple-700 font-bold text-[10px] rounded-lg flex items-center gap-1">
+                        <RotateCcw className="w-2.5 h-2.5" /> Day {c.sequenceInfo.nurtureDay || 18}/30 ({c.sequenceInfo.recycleCount || 0}x)
+                      </span>
+                    )}
+                    {c.outreachStage === 'Queued for Outreach' && (
+                      <span className="text-[10px] text-[#64748B]">Ready for Launch</span>
+                    )}
+                    {c.outreachStage === 'Lead Created' && (
+                      <span className="text-[10px] text-emerald-700 font-bold">Captured</span>
+                    )}
+                  </td>
+
+                  {/* Linked Deals */}
+                  <td className="py-3.5 px-4">
+                    <span className="font-mono text-[11px] font-bold text-[#155EEF] bg-[#EAF2FF] px-2 py-0.5 rounded">
+                      {c.propertyDealIds?.length || 0} Deal(s)
+                    </span>
                   </td>
 
                   <td className="py-3.5 px-4 text-[#475569]">{c.ownerName}</td>
 
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      {onOpenCallModal && (
+                        <button
+                          onClick={() => onOpenCallModal(c)}
+                          className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
+                          title="Call Realtor (Pauses AI)"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       <button
                         onClick={() => onSelectContact(c)}
-                        className="px-2.5 py-1 rounded-lg bg-[#F5F8FC] border border-[#E2E8F0] text-[#0F172A] hover:bg-[#EAF2FF] hover:border-[#BFDBFE] text-[11px] font-semibold transition-all"
+                        className="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A] hover:bg-[#EAF2FF] text-[11px] font-semibold transition-all"
                       >
                         Profile
                       </button>
@@ -328,16 +426,20 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                               email: c.email,
                               phone: c.phone,
                               market: c.market,
-                              status: c.status,
+                              status: c.outreachStage,
+                              outreachStage: c.outreachStage,
+                              temperature: c.temperature,
                               ownerId: c.ownerId,
                               ownerName: c.ownerName,
                               tags: c.tags,
                               grade: c.grade,
-                              score: c.score
+                              score: c.score,
+                              sequenceInfo: c.sequenceInfo,
+                              propertyDealIds: c.propertyDealIds as any || []
                             });
                             setShowAddModal(true);
                           }}
-                          className="p-1.5 rounded-lg bg-[#F5F8FC] border border-[#E2E8F0] text-[#475569] hover:text-[#0B1F3A] hover:bg-[#EAF2FF] hover:border-[#BFDBFE] transition-all"
+                          className="p-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569] hover:text-[#0B1F3A]"
                           title="Edit Realtor"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -347,7 +449,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                       {canCreate && (
                         <button
                           onClick={() => setArchivingContactId(c.id)}
-                          className="p-1.5 rounded-lg bg-[#F5F8FC] border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50 hover:border-[#E11D48]/40 transition-all"
+                          className="p-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50"
                           title="Archive Realtor"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -376,13 +478,13 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-[#0B1F3A]">Import Realtor CSV List</h3>
-                <p className="text-xs text-[#64748B]">Column Mapping & Duplicate Verification</p>
+                <p className="text-xs text-[#64748B]">Auto-Maps Columns & Enrolls in Queued Outreach</p>
               </div>
             </div>
 
             {csvStep === 1 && (
               <div className="space-y-4 pt-2">
-                <div className="border-2 border-dashed border-[#E2E8F0] rounded-xl p-8 text-center bg-[#F5F8FC] cursor-pointer">
+                <div className="border-2 border-dashed border-[#E2E8F0] rounded-xl p-8 text-center bg-[#F8FAFC] cursor-pointer">
                   <Upload className="w-8 h-8 text-[#64748B] mx-auto mb-2" />
                   <p className="text-xs text-[#0F172A] font-semibold">Upload DFW Realtor CSV file</p>
                 </div>
@@ -397,7 +499,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
 
             {csvStep === 2 && (
               <div className="space-y-3 text-xs pt-2">
-                <div className="flex justify-between p-2.5 bg-[#F5F8FC] rounded-xl border border-[#E2E8F0]">
+                <div className="flex justify-between p-2.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                   <span className="text-[#475569]">Column: Name</span>
                   <strong className="text-[#155EEF]">&rarr; Full Name</strong>
                 </div>
@@ -426,7 +528,18 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                         email: 'j.sterling@sothebys.com',
                         phone: '(214) 771-0099',
                         market: 'Dallas Metro - Southlake',
-                        status: 'Active in Outreach',
+                        status: 'Queued for Outreach',
+                        outreachStage: 'Queued for Outreach',
+                        temperature: 'Warm',
+                        sequenceInfo: {
+                          currentTouch: 0,
+                          totalTouches: 5,
+                          nurtureDay: 0,
+                          recycleCount: 0,
+                          lastTouchDate: 'Never',
+                          nextScheduledTouch: 'Touch 1 Ready',
+                          channel: 'sms'
+                        },
                         ownerId: currentUser.id,
                         ownerName: currentUser.name,
                         tags: ['Imported CSV'],
@@ -468,7 +581,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F5F8FC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                  className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                 />
               </div>
 
@@ -480,7 +593,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                     required
                     value={formData.licenseNumber}
                     onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F5F8FC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                   />
                 </div>
                 <div>
@@ -490,8 +603,59 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
                     required
                     value={formData.brokerage}
                     onChange={(e) => setFormData({ ...formData, brokerage: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F5F8FC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#475569] font-semibold mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#475569] font-semibold mb-1">Phone</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#475569] font-semibold mb-1">Outreach Stage</label>
+                  <select
+                    value={formData.outreachStage}
+                    onChange={(e) => setFormData({ ...formData, outreachStage: e.target.value as OutreachStage, status: e.target.value as OutreachStage })}
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                  >
+                    {OUTREACH_STAGES_LIST.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#475569] font-semibold mb-1">Temperature</label>
+                  <select
+                    value={formData.temperature}
+                    onChange={(e) => setFormData({ ...formData, temperature: e.target.value as ContactTemperature })}
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
+                  >
+                    <option value="Hot">🔥 Hot</option>
+                    <option value="Warm">⚡ Warm</option>
+                    <option value="Cold">❄️ Cold</option>
+                  </select>
                 </div>
               </div>
 
@@ -514,7 +678,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact }) => {
             <h3 className="text-base font-bold text-[#0B1F3A]">Archive Realtor Record?</h3>
             <p className="text-xs text-[#64748B]">Soft-deletes record while preserving audit trail history.</p>
             <div className="flex gap-2">
-              <button onClick={() => setArchivingContactId(null)} className="flex-1 py-2.5 bg-[#F5F8FC] border border-[#E2E8F0] text-[#0F172A] text-xs font-bold rounded-xl">Cancel</button>
+              <button onClick={() => setArchivingContactId(null)} className="flex-1 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A] text-xs font-bold rounded-xl">Cancel</button>
               <button
                 onClick={() => {
                   archiveContact(archivingContactId);

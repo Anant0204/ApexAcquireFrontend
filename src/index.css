@@ -111,19 +111,29 @@ a.bg-\[\#155EEF\]:active {
   box-shadow: 0 2px 8px rgba(21, 94, 239, 0.2) !important;
 }
 
-/* Sidebar Active & Hover Enhancements */
+/* Sidebar Luxury Obsidian & Royal Sapphire Styling */
+.sidebar-luxury-container {
+  background: linear-gradient(180deg, #070D1E 0%, #0B1533 50%, #050A18 100%) !important;
+  border-right: 1px solid rgba(30, 41, 75, 0.8) !important;
+  box-shadow: 4px 0 28px rgba(3, 7, 18, 0.25) !important;
+}
+
 .sidebar-item-hover {
-  transition: all 0.18s ease-in-out;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #94A3B8 !important;
 }
 .sidebar-item-hover:hover {
-  background: linear-gradient(90deg, #F0F6FF 0%, #EAF2FF 100%) !important;
-  color: #0B1F3A !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  transform: translateX(2px);
 }
 
 .sidebar-item-active {
-  background: linear-gradient(135deg, #0B1F3A 0%, #155EEF 100%) !important;
+  background: linear-gradient(135deg, #1E40AF 0%, #2563EB 50%, #3B82F6 100%) !important;
   color: #FFFFFF !important;
-  box-shadow: 0 4px 16px rgba(21, 94, 239, 0.3) !important;
+  border: 1px solid rgba(147, 197, 253, 0.4) !important;
+  box-shadow: 0 0 24px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(11, 31, 58, 0.3) !important;
 }
 
 /* Input Focus Glow */
@@ -161,3 +171,23 @@ input:focus, select:focus, textarea:focus {
 .bg-\[\#7c5cfc\]\/10, .bg-\[\#7c5cfc\]\/15, .bg-\[\#7c5cfc\]\/20 { background-color: #EAF2FF !important; }
 .border-\[\#7c5cfc\]\/30, .border-\[\#7c5cfc\]\/40 { border-color: #BFDBFE !important; }
 .border-\[\#7c5cfc\]\/50 { border-color: #155EEF !important; }
+
+/* Mobile Kanban Scroll Snap & Touch */
+.kanban-scroll-container {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.kanban-column-snap {
+  scroll-snap-align: center;
+  scroll-snap-stop: normal;
+}
+
+@media (max-width: 640px) {
+  .kanban-column-snap {
+    width: 86vw !important;
+    max-width: 320px !important;
+    flex-shrink: 0 !important;
+  }
+}

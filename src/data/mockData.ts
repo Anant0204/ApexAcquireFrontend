@@ -1,4 +1,15 @@
-import type { UserProfile, RealtorContact, Conversation, PropertyDeal, AppNotification, AuditLogItem } from '../types/crm';
+import type { 
+  UserProfile, 
+  RealtorContact, 
+  Conversation, 
+  PropertyDeal, 
+  AppNotification, 
+  AuditLogItem, 
+  CRMTask, 
+  EmailTemplate, 
+  WorkflowRule,
+  AIPersonalityConfig 
+} from '../types/crm';
 
 export const MOCK_USERS: UserProfile[] = [
   { id: 'usr-1', name: 'Alexander Vance', email: 'alex.vance@apexacquire.com', role: 'ADMIN', avatar: 'AV', title: 'Managing Director & Partner', status: 'Active' },
@@ -17,15 +28,27 @@ export const INITIAL_CONTACTS: RealtorContact[] = [
     email: 'sarah.jenkins@compass.com',
     phone: '(214) 892-4102',
     market: 'Dallas Metro - Highland Park',
-    status: 'Responded',
+    status: 'Lead Created',
+    outreachStage: 'Lead Created',
+    temperature: 'Hot',
+    sequenceInfo: {
+      currentTouch: 3,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: 'Today, 10:15 AM',
+      nextScheduledTouch: 'Completed (Lead Created)',
+      channel: 'sms'
+    },
     ownerId: 'usr-3',
     ownerName: 'Marcus Sterling',
-    tags: ['High Volume', 'Luxury Specialist'],
+    tags: ['High Volume', 'Luxury Specialist', 'Probate'],
     lastContacted: '10 mins ago',
     lastResponse: '5 mins ago',
     grade: 'A',
     score: 94,
-    notes: ['Motivated seller for fast 14-day cash settlement.']
+    notes: ['Motivated seller for fast 14-day cash settlement on Bordeaux Ave.', 'Also mentioned another potential off-market property on Armstrong Pkwy.'],
+    propertyDealIds: ['dl-1', 'dl-2']
   },
   {
     id: 'cnt-102',
@@ -35,15 +58,27 @@ export const INITIAL_CONTACTS: RealtorContact[] = [
     email: 'r.vance@kw.com',
     phone: '(972) 341-8820',
     market: 'Fort Worth / Tarrant',
-    status: 'Escalated',
+    status: 'Needs Human Touch',
+    outreachStage: 'Needs Human Touch',
+    temperature: 'Hot',
+    sequenceInfo: {
+      currentTouch: 2,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: 'Today, 09:00 AM',
+      nextScheduledTouch: 'Paused (Human Takeover)',
+      channel: 'sms'
+    },
     ownerId: 'usr-4',
     ownerName: 'Sophia Chen',
-    tags: ['Fixer Upper'],
+    tags: ['Fixer Upper', 'Distressed'],
     lastContacted: '1 hour ago',
     lastResponse: '42 mins ago',
     grade: 'A',
     score: 88,
-    notes: ['Awaiting final seller confirmation before Monday listing.']
+    notes: ['Awaiting final seller confirmation before Monday listing. Prefers human specialist conversation.'],
+    propertyDealIds: ['dl-3']
   },
   {
     id: 'cnt-103',
@@ -53,15 +88,27 @@ export const INITIAL_CONTACTS: RealtorContact[] = [
     email: 'abrooks@coldwellbanker.com',
     phone: '(214) 559-0012',
     market: 'Plano / Frisco',
-    status: 'Active in Outreach',
+    status: 'Outreach Sent',
+    outreachStage: 'Outreach Sent',
+    temperature: 'Warm',
+    sequenceInfo: {
+      currentTouch: 2,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: '2 hours ago',
+      nextScheduledTouch: 'Touch 3 in 2 days',
+      channel: 'sms'
+    },
     ownerId: 'usr-3',
     ownerName: 'Marcus Sterling',
-    tags: ['Suburbs'],
+    tags: ['Suburbs', 'Single Family'],
     lastContacted: '2 hours ago',
-    lastResponse: '1 hour ago',
+    lastResponse: 'None yet',
     grade: 'B',
     score: 76,
-    notes: []
+    notes: ['Cadence Touch 2 sent (Proof of Funds & Fast Close criteria).'],
+    propertyDealIds: []
   },
   {
     id: 'cnt-104',
@@ -71,15 +118,27 @@ export const INITIAL_CONTACTS: RealtorContact[] = [
     email: 'mchang@remax.net',
     phone: '(469) 782-9901',
     market: 'Arlington / Mansfield',
-    status: 'Responded',
+    status: 'Responded/Qualifying',
+    outreachStage: 'Responded/Qualifying',
+    temperature: 'Warm',
+    sequenceInfo: {
+      currentTouch: 1,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: '3 hours ago',
+      nextScheduledTouch: 'AI Bot Engaged',
+      channel: 'sms'
+    },
     ownerId: 'usr-2',
     ownerName: 'Elena Rostova',
-    tags: ['REO Specialist'],
+    tags: ['REO Specialist', 'Investor Friendly'],
     lastContacted: '3 hours ago',
     lastResponse: '2 hours ago',
     grade: 'A',
     score: 91,
-    notes: ['3209 Oakridge Dr, Arlington TX available under market.']
+    notes: ['Realtor replied: "Yes I have 2 investor specials in Tarrant county, asking $320k." Bot currently qualifying.'],
+    propertyDealIds: []
   },
   {
     id: 'cnt-105',
@@ -89,15 +148,117 @@ export const INITIAL_CONTACTS: RealtorContact[] = [
     email: 'jessica.thorne@ebby.com',
     phone: '(972) 881-2390',
     market: 'Dallas Metro - Uptown',
-    status: 'Opted Out',
+    status: 'No Response, In 30-Day Nurture',
+    outreachStage: 'No Response, In 30-Day Nurture',
+    temperature: 'Cold',
+    sequenceInfo: {
+      currentTouch: 5,
+      totalTouches: 5,
+      nurtureDay: 19,
+      recycleCount: 1,
+      lastTouchDate: '19 days ago',
+      nextScheduledTouch: 'Auto-Recycle in 11 days (to Queued for Outreach)',
+      channel: 'sms'
+    },
     ownerId: 'usr-4',
     ownerName: 'Sophia Chen',
-    tags: ['Unresponsive'],
-    lastContacted: '1 day ago',
-    lastResponse: '1 day ago',
+    tags: ['Nurture Cycle', 'Recycled 1x'],
+    lastContacted: '19 days ago',
+    lastResponse: 'None',
+    grade: 'C',
+    score: 45,
+    notes: ['Finished initial 5-touch sequence with no reply. In permanent 30-day nurture cycle. Recycled 1 time previously.'],
+    propertyDealIds: []
+  },
+  {
+    id: 'cnt-106',
+    name: 'Harrison Wells',
+    licenseNumber: 'TREC #0719823',
+    brokerage: 'Briggs Freeman Sotheby\'s',
+    email: 'h.wells@sothebysdfw.com',
+    phone: '(214) 438-9912',
+    market: 'Southlake / Colleyville',
+    status: 'Queued for Outreach',
+    outreachStage: 'Queued for Outreach',
+    temperature: 'Cold',
+    sequenceInfo: {
+      currentTouch: 0,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 2,
+      lastTouchDate: 'Never',
+      nextScheduledTouch: 'Ready for Batch Launch Touch 1',
+      channel: 'sms'
+    },
+    ownerId: 'usr-3',
+    ownerName: 'Marcus Sterling',
+    tags: ['Luxury Broker', 'Recycled 2x'],
+    lastContacted: 'Never',
+    lastResponse: 'None',
+    grade: 'B',
+    score: 70,
+    notes: ['Recycled from 30-Day Nurture loop back into Queued for Outreach. Ready for fresh 5-touch campaign.'],
+    propertyDealIds: []
+  },
+  {
+    id: 'cnt-107',
+    name: 'David Kowalski',
+    licenseNumber: 'TREC #0492810',
+    brokerage: 'Century 21 Judge Fite',
+    email: 'dkowalski@c21jf.com',
+    phone: '(817) 662-1100',
+    market: 'Grand Prairie',
+    status: 'Not Interested - CLOSED',
+    outreachStage: 'Not Interested - CLOSED',
+    temperature: 'Cold',
+    sequenceInfo: {
+      currentTouch: 2,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: '2 days ago',
+      nextScheduledTouch: 'Closed / Inactive',
+      channel: 'sms'
+    },
+    ownerId: 'usr-4',
+    ownerName: 'Sophia Chen',
+    tags: ['Retail Only'],
+    lastContacted: '2 days ago',
+    lastResponse: '2 days ago',
     grade: 'D',
-    score: 22,
-    notes: []
+    score: 15,
+    notes: ['Replied "Only work with traditional retail buyers, do not message me again." Closed.'],
+    propertyDealIds: []
+  },
+  {
+    id: 'cnt-108',
+    name: 'Patricia Morales',
+    licenseNumber: 'TREC #0881923',
+    brokerage: 'United Real Estate DFW',
+    email: 'pmorales@uniteddfw.com',
+    phone: '(972) 441-9080',
+    market: 'Irving / Las Colinas',
+    status: 'Opted Out / DND - CLOSED',
+    outreachStage: 'Opted Out / DND - CLOSED',
+    temperature: 'Cold',
+    sequenceInfo: {
+      currentTouch: 1,
+      totalTouches: 5,
+      nurtureDay: 0,
+      recycleCount: 0,
+      lastTouchDate: '3 days ago',
+      nextScheduledTouch: 'DND Permanent Block',
+      channel: 'sms'
+    },
+    ownerId: 'usr-3',
+    ownerName: 'Marcus Sterling',
+    tags: ['Opt-Out', 'DND'],
+    lastContacted: '3 days ago',
+    lastResponse: '3 days ago',
+    grade: 'D',
+    score: 10,
+    notes: ['Replied STOP to SMS. System automatically added DND tag and closed contact.'],
+    propertyDealIds: []
   }
 ];
 
@@ -113,15 +274,17 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
     timestamp: '5 mins ago',
     grade: 'A',
     score: 94,
+    temperature: 'Hot',
     gradeReason: 'Captured property address (4812 Bordeaux Ave), asking price ($1.45M), and fast closing timeline.',
     status: 'Leads With Address',
+    outreachStage: 'Lead Created',
     aiStatus: 'Active',
     unread: true,
     classification: 'Has Property',
     messages: [
-      { id: 'm1', sender: 'ai', text: 'Hi Sarah, Marcus here with Apex Capital. Looking for off-market deals in Highland Park.', timestamp: '10:15 AM', channel: 'sms' },
-      { id: 'm2', sender: 'realtor', text: 'Hey Marcus! I have an estate property before MLS listing.', timestamp: '10:18 AM', channel: 'sms' },
-      { id: 'm3', sender: 'ai', text: 'Great! What is the address and asking price?', timestamp: '10:19 AM', channel: 'sms' },
+      { id: 'm1', sender: 'ai', text: 'Hi Sarah, Marcus here with Apex Capital. Looking for off-market inventory in Highland Park for all-cash acquisition.', timestamp: '10:15 AM', channel: 'sms' },
+      { id: 'm2', sender: 'realtor', text: 'Hey Marcus! I actually have an estate probate property before MLS listing.', timestamp: '10:18 AM', channel: 'sms' },
+      { id: 'm3', sender: 'ai', text: 'Great! What is the property address and what is the seller asking?', timestamp: '10:19 AM', channel: 'sms' },
       { id: 'm4', sender: 'realtor', text: 'Yes, 4812 Bordeaux Ave in Highland Park! Asking $1,450,000, roof needs work. Can close in 14 days.', timestamp: '10:22 AM', channel: 'sms' }
     ],
     propertyCaptured: {
@@ -149,16 +312,42 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
     timestamp: '42 mins ago',
     grade: 'A',
     score: 88,
+    temperature: 'Hot',
     gradeReason: 'High intent, timeline urgency indicated (listing Monday), waiting on final seller confirmation.',
     status: 'Needs Human',
+    outreachStage: 'Needs Human Touch',
     aiStatus: 'Human Takeover',
     unread: false,
     classification: 'Interested',
     messages: [
-      { id: 'm10', sender: 'ai', text: 'Hello Robert, do you have single-family inventory in Tarrant County?', timestamp: '09:00 AM', channel: 'sms' },
+      { id: 'm10', sender: 'ai', text: 'Hello Robert, do you have single-family off-market deals in Tarrant County?', timestamp: '09:00 AM', channel: 'sms' },
       { id: 'm11', sender: 'realtor', text: 'I might have a 3/2 near Arlington. Owner hesitant about investor lowballs.', timestamp: '09:30 AM', channel: 'sms' },
       { id: 'm12', sender: 'human', text: 'Hi Robert, Marcus from Apex taking over. We pay fair market cash with zero seller commission fees.', timestamp: '09:40 AM', channel: 'sms' },
       { id: 'm13', sender: 'realtor', text: 'I need to check with the seller if they want to entertain cash offers before listing on Monday.', timestamp: '09:45 AM', channel: 'sms' }
+    ]
+  },
+  {
+    id: 'conv-3',
+    contactId: 'cnt-104',
+    realtorName: 'Michael Chang',
+    realtorPhone: '(469) 782-9901',
+    realtorEmail: 'mchang@remax.net',
+    brokerage: 'RE/MAX Premier DFW',
+    latestMessage: 'Yes I have 2 investor specials in Tarrant county, asking around $320k.',
+    timestamp: '2 hours ago',
+    grade: 'A',
+    score: 91,
+    temperature: 'Warm',
+    gradeReason: 'Stated available off-market inventory with price range ($320k).',
+    status: 'Interested',
+    outreachStage: 'Responded/Qualifying',
+    aiStatus: 'Active',
+    unread: false,
+    classification: 'Has Property',
+    messages: [
+      { id: 'm20', sender: 'ai', text: 'Hi Michael, looking for off-market inventory in Arlington. Do you have anything coming up?', timestamp: '08:15 AM', channel: 'sms' },
+      { id: 'm21', sender: 'realtor', text: 'Yes I have 2 investor specials in Tarrant county, asking around $320k.', timestamp: '08:45 AM', channel: 'sms' },
+      { id: 'm22', sender: 'ai', text: 'Awesome! Could you share the first address and approximate condition?', timestamp: '08:46 AM', channel: 'sms' }
     ]
   }
 ];
@@ -184,6 +373,7 @@ export const INITIAL_DEALS: PropertyDeal[] = [
     ownerName: 'Marcus Sterling',
     grade: 'A',
     score: 94,
+    temperature: 'Hot',
     realtorName: 'Sarah Jenkins',
     realtorBrokerage: 'Compass Real Estate DFW',
     realtorPhone: '(214) 892-4102',
@@ -210,18 +400,366 @@ export const INITIAL_DEALS: PropertyDeal[] = [
       inspectionPeriodDays: 5,
       specialProvisions: 'AS-IS cash acquisition with 5-day inspection period.'
     }
+  },
+  {
+    id: 'dl-2',
+    conversationId: 'conv-1',
+    contactId: 'cnt-101',
+    address: '7420 Armstrong Pkwy',
+    city: 'Dallas',
+    state: 'TX',
+    zip: '75205',
+    askingPrice: 2100000,
+    beds: 5,
+    baths: 4.5,
+    sqft: 4600,
+    yearBuilt: 2004,
+    propertyType: 'Single Family Residence',
+    stage: 'New Property',
+    isAiInbound: false,
+    ownerId: 'usr-3',
+    ownerName: 'Marcus Sterling',
+    grade: 'A',
+    score: 90,
+    temperature: 'Hot',
+    realtorName: 'Sarah Jenkins',
+    realtorBrokerage: 'Compass Real Estate DFW',
+    realtorPhone: '(214) 892-4102',
+    realtorEmail: 'sarah.jenkins@compass.com',
+    createdAt: 'Today, 10:30 AM',
+    updatedAt: '5 mins ago',
+    source: 'Same Contact Secondary Lead',
+    underwriting: {
+      arv: 2600000,
+      estimatedRehab: 320000,
+      targetWholesaleFee: 100000,
+      calculatedMao: 2180000
+    }
+  },
+  {
+    id: 'dl-3',
+    conversationId: 'conv-2',
+    contactId: 'cnt-102',
+    address: '3209 Oakridge Dr',
+    city: 'Arlington',
+    state: 'TX',
+    zip: '76013',
+    askingPrice: 380000,
+    beds: 3,
+    baths: 2,
+    sqft: 2150,
+    yearBuilt: 1985,
+    propertyType: 'Single Family Residence',
+    stage: 'Need Help',
+    isAiInbound: true,
+    ownerId: 'usr-4',
+    ownerName: 'Sophia Chen',
+    grade: 'A',
+    score: 88,
+    temperature: 'Hot',
+    realtorName: 'Robert Vance',
+    realtorBrokerage: 'Keller Williams Urban Dallas',
+    realtorPhone: '(972) 341-8820',
+    realtorEmail: 'r.vance@kw.com',
+    createdAt: 'Yesterday, 04:15 PM',
+    updatedAt: '1 hour ago',
+    source: 'AI Outreach Capture',
+    underwriting: {
+      arv: 490000,
+      estimatedRehab: 65000,
+      targetWholesaleFee: 35000,
+      calculatedMao: 390000
+    }
+  },
+  {
+    id: 'dl-4',
+    contactId: 'cnt-104',
+    address: '1410 Meadowview Ln',
+    city: 'Mansfield',
+    state: 'TX',
+    zip: '76063',
+    askingPrice: 320000,
+    beds: 3,
+    baths: 2,
+    sqft: 1850,
+    yearBuilt: 1995,
+    propertyType: 'Single Family Residence',
+    stage: 'Offer Made',
+    isAiInbound: false,
+    ownerId: 'usr-2',
+    ownerName: 'Elena Rostova',
+    grade: 'B',
+    score: 82,
+    temperature: 'Warm',
+    realtorName: 'Michael Chang',
+    realtorBrokerage: 'RE/MAX Premier DFW',
+    realtorPhone: '(469) 782-9901',
+    realtorEmail: 'mchang@remax.net',
+    createdAt: '2 days ago',
+    updatedAt: '3 hours ago',
+    source: 'Realtor Inbound',
+    underwriting: {
+      arv: 410000,
+      estimatedRehab: 45000,
+      targetWholesaleFee: 30000,
+      calculatedMao: 335000
+    },
+    offerDetails: {
+      purchasePrice: 305000,
+      earnestMoney: 3000,
+      optionFee: 300,
+      optionPeriodDays: 7,
+      closingDate: '2026-09-30',
+      buyerEntity: 'Apex Acquisitions DFW LLC',
+      sellerName: 'Property Owner',
+      titleCompany: 'Republic Title',
+      financingType: 'Cash',
+      inspectionPeriodDays: 7,
+      specialProvisions: 'AS-IS Cash'
+    }
   }
 ];
+
+export const INITIAL_TASKS: CRMTask[] = [
+  {
+    id: 'tsk-1',
+    title: 'Needs Human Touch: Price Negotiation with Robert Vance',
+    description: 'Realtor Robert Vance responded with hesitation about investor pricing. Human takeover required to finalize cash offer terms.',
+    type: 'human_touch',
+    priority: 'URGENT',
+    status: 'PENDING',
+    assignedToId: 'usr-4',
+    assignedToName: 'Sophia Chen',
+    dueDate: 'Today by 2:00 PM',
+    relatedContactId: 'cnt-102',
+    relatedContactName: 'Robert Vance',
+    relatedDealId: 'dl-3',
+    relatedDealAddress: '3209 Oakridge Dr',
+    relatedConversationId: 'conv-2',
+    createdAt: '42 mins ago'
+  },
+  {
+    id: 'tsk-2',
+    title: 'Lead Created: Underwrite 4812 Bordeaux Ave & Prepare Contract',
+    description: 'Sarah Jenkins provided estate property address ($1.45M asking). Review MAO calculation and draft TREC 1-4 contract.',
+    type: 'lead_created',
+    priority: 'HIGH',
+    status: 'PENDING',
+    assignedToId: 'usr-3',
+    assignedToName: 'Marcus Sterling',
+    dueDate: 'Today by 5:00 PM',
+    relatedContactId: 'cnt-101',
+    relatedContactName: 'Sarah Jenkins',
+    relatedDealId: 'dl-1',
+    relatedDealAddress: '4812 Bordeaux Ave',
+    relatedConversationId: 'conv-1',
+    createdAt: '10 mins ago'
+  },
+  {
+    id: 'tsk-3',
+    title: 'Manager Review Needed: Oakridge Dr Deal Stalled',
+    description: 'Deal moved to "Need Help" stage. Seller requires proof of funds letter and option fee increased to $1,000.',
+    type: 'need_help',
+    priority: 'HIGH',
+    status: 'PENDING',
+    assignedToId: 'usr-2',
+    assignedToName: 'Elena Rostova',
+    dueDate: 'Tomorrow by 11:00 AM',
+    relatedDealId: 'dl-3',
+    relatedDealAddress: '3209 Oakridge Dr',
+    createdAt: '1 hour ago'
+  },
+  {
+    id: 'tsk-4',
+    title: 'Phone Call Follow-Up: Sarah Jenkins Secondary Listing',
+    description: 'Logged phone call. Send follow-up email confirming criteria for 7420 Armstrong Pkwy secondary property.',
+    type: 'phone_call',
+    priority: 'MEDIUM',
+    status: 'COMPLETED',
+    assignedToId: 'usr-3',
+    assignedToName: 'Marcus Sterling',
+    dueDate: 'Today',
+    relatedContactId: 'cnt-101',
+    relatedContactName: 'Sarah Jenkins',
+    createdAt: '3 hours ago',
+    completedAt: '1 hour ago'
+  }
+];
+
+export const INITIAL_TEMPLATES: EmailTemplate[] = [
+  {
+    id: 'tpl-1',
+    name: 'Touch 1: Off-Market Introduction & Buying Criteria',
+    category: '5_touch_cadence',
+    touchNumber: 1,
+    channel: 'sms',
+    body: 'Hi {{first_name}}, Marcus here with Apex Capital. We are actively purchasing off-market single family properties in {{market}} for cash with 10-14 day closing. Do you have any pocket listings or probate properties coming up?',
+    variables: ['first_name', 'market', 'company_name'],
+    lastUpdated: 'Today'
+  },
+  {
+    id: 'tpl-2',
+    name: 'Touch 2: Fast Proof of Funds & Zero Commission',
+    category: '5_touch_cadence',
+    touchNumber: 2,
+    channel: 'sms',
+    body: 'Hey {{first_name}}, following up on my previous message. We have $15M in private allocation deployed this month for DFW. We can waive inspection contingencies and cover seller title fees. Any inventory available?',
+    variables: ['first_name'],
+    lastUpdated: 'Yesterday'
+  },
+  {
+    id: 'tpl-3',
+    name: 'Touch 3: Fixer-Upper & Distressed Focus',
+    category: '5_touch_cadence',
+    touchNumber: 3,
+    channel: 'sms',
+    body: 'Hi {{first_name}}, we also take properties in AS-IS condition that require major roof, foundation, or cosmetic rehab. Do you represent any sellers needing a hassle-free cash exit?',
+    variables: ['first_name'],
+    lastUpdated: '3 days ago'
+  },
+  {
+    id: 'tpl-4',
+    name: 'Touch 4: Direct Quick Question',
+    category: '5_touch_cadence',
+    touchNumber: 4,
+    channel: 'sms',
+    body: 'Hey {{first_name}}, quick question — would you be open to double-ending commission if we purchase one of your upcoming listings off-market before MLS?',
+    variables: ['first_name'],
+    lastUpdated: '4 days ago'
+  },
+  {
+    id: 'tpl-5',
+    name: 'Touch 5: Breakup / Transition to 30-Day Nurture',
+    category: '5_touch_cadence',
+    touchNumber: 5,
+    channel: 'sms',
+    body: 'Hi {{first_name}}, I assume you are busy or don\'t have off-market inventory right now. I\'ll check back in next month with our updated buy-box. Feel free to save my direct cell number if anything arises!',
+    variables: ['first_name'],
+    lastUpdated: '5 days ago'
+  },
+  {
+    id: 'tpl-6',
+    name: '30-Day Nurture: Monthly DFW Demand Update',
+    category: '30_day_nurture',
+    channel: 'sms',
+    body: 'Hi {{first_name}}, checking back in! Apex Capital is expanding acquisitions in {{market}}. We currently have immediate capital ready for 3+ bed single family homes. Have any new opportunities crossed your desk?',
+    variables: ['first_name', 'market'],
+    lastUpdated: '1 week ago'
+  },
+  {
+    id: 'tpl-7',
+    name: 'Formal Cash Purchase Letter of Intent (LOI)',
+    category: 'deal_offers',
+    channel: 'email',
+    subject: 'Official Cash Purchase LOI — {{property_address}}',
+    body: 'Dear {{realtor_name}},\n\nApex Acquisitions DFW LLC is pleased to submit this formal all-cash purchase offer for {{property_address}}:\n\n• Purchase Price: ${{purchase_price}}\n• Earnest Money: ${{earnest_money}}\n• Inspection Period: {{option_days}} Days\n• Closing Timeline: 14 Days Cash Close\n• Title Company: Republic Title DFW\n\nPlease find the signed LOI attached for seller review.\n\nBest regards,\n{{agent_name}}\nApex Capital Acquisitions',
+    variables: ['realtor_name', 'property_address', 'purchase_price', 'earnest_money', 'option_days', 'agent_name'],
+    lastUpdated: '2 days ago'
+  }
+];
+
+export const INITIAL_WORKFLOWS: WorkflowRule[] = [
+  {
+    id: 'wf-1',
+    name: '5-Touch Automated Cadence Dispatcher',
+    description: 'When a contact is in "Queued for Outreach", dispatches Touch 1-5 spaced over 10 days until a response or nurture transition.',
+    trigger: 'Contact enters "Queued for Outreach"',
+    condition: 'Contact DND is false AND phone number is verified',
+    actions: ['Move to "Outreach Sent"', 'Dispatch Touch 1 SMS', 'Schedule Touch 2 in 48 hours'],
+    isActive: true,
+    executionCount: 1482,
+    lastExecuted: '4 mins ago'
+  },
+  {
+    id: 'wf-2',
+    name: 'AI Auto-Grading & Hot/Warm/Cold Temperature Classifier',
+    description: 'When realtor responds, evaluates message intent using GPT-4o and assigns Temperature (Hot, Warm, Cold) and Grade score.',
+    trigger: 'Inbound SMS received from Realtor',
+    condition: 'Outreach Stage is "Outreach Sent" or "Responded/Qualifying"',
+    actions: ['Update Stage to "Responded/Qualifying"', 'Calculate Temperature', 'Trigger AI reply if within limits'],
+    isActive: true,
+    executionCount: 894,
+    lastExecuted: '5 mins ago'
+  },
+  {
+    id: 'wf-3',
+    name: 'Lead Creation & Automatic AI Deal Cloning',
+    description: 'When property address is captured in conversation, clones opportunity into AI Deals and creates an underwriting task.',
+    trigger: 'Valid address and asking price extracted by AI Bot',
+    condition: 'Confidence score > 85%',
+    actions: ['Update Stage to "Lead Created"', 'Clone to AI Deals ("New Property")', 'Create Priority Task for Agent', 'Send App Notification'],
+    isActive: true,
+    executionCount: 312,
+    lastExecuted: '10 mins ago'
+  },
+  {
+    id: 'wf-4',
+    name: '30-Day Nurture Permanent Loop & Auto-Recycle',
+    description: 'Contacts with no response after 5 touches enter 30-Day Nurture. After 30 days, automatically recycles back to "Queued for Outreach".',
+    trigger: '30 Days elapsed in "No Response, In 30-Day Nurture"',
+    condition: 'Contact status is not Opted Out / DND',
+    actions: ['Increment Recycle Counter (e.g. 1x -> 2x)', 'Reset 5-Touch sequence to Touch 1', 'Move Stage back to "Queued for Outreach"', 'Log Audit History'],
+    isActive: true,
+    executionCount: 640,
+    lastExecuted: '1 hour ago'
+  },
+  {
+    id: 'wf-5',
+    name: 'Phone Call Safeguard: Immediate AI Bot Pause',
+    description: 'When an agent places or logs a phone call, immediately pauses AI bot, switches stage to "Needs Human Touch", and creates a task.',
+    trigger: 'Click-To-Call initiated or manual call logged',
+    condition: 'AI Status is Active',
+    actions: ['Halt AI Texting', 'Set Conversation AI to "Human Takeover"', 'Move Stage to "Needs Human Touch"', 'Create Follow-up Task'],
+    isActive: true,
+    executionCount: 154,
+    lastExecuted: '3 hours ago'
+  },
+  {
+    id: 'wf-6',
+    name: 'Manager Escalation on Deal "Need Help"',
+    description: 'When any property deal is moved to "Need Help" stage, automatically notifies Head of Acquisitions and creates manager task.',
+    trigger: 'Deal stage changed to "Need Help"',
+    condition: 'Deal is active and unarchived',
+    actions: ['Assign Manager Task to Elena Rostova', 'Send Urgent Notification', 'Flag Deal with Red Alert Badge'],
+    isActive: true,
+    executionCount: 48,
+    lastExecuted: '1 hour ago'
+  }
+];
+
+export const INITIAL_AI_CONFIG: AIPersonalityConfig = {
+  personaName: 'Apex AI Acquisition Specialist',
+  tone: 'direct',
+  systemInstructions: 'You are an executive acquisitions specialist at Apex Capital. Your objective is to politely engage licensed Texas realtors to discover off-market, pre-MLS, probate, or distressed single-family properties in Dallas-Fort Worth. Immediately capture 1) exact street address, 2) asking price, 3) property condition, and 4) closing timeline. Never commit to a binding purchase price without manager sign-off.',
+  creativityTemperature: 0.3,
+  autoGradeHotCriteria: [
+    'Provides exact property address and asking price',
+    'Indicates urgency (probate, pre-foreclosure, 14-day close)',
+    'Seller motivated for cash offer before MLS listing'
+  ],
+  autoGradeWarmCriteria: [
+    'Confirms having off-market inventory in target market',
+    'Asks for proof of funds or buying criteria',
+    'Open to cash offer pending seller conversation'
+  ],
+  autoGradeColdCriteria: [
+    'No reply after multiple touches',
+    'Unclear generic responses',
+    'Prefers traditional retail buyer representation'
+  ],
+  maxConsecutiveReplies: 4,
+  pauseOnPhoneCall: true
+};
 
 export const INITIAL_NOTIFICATIONS: AppNotification[] = [
   {
     id: 'nt-1',
     title: 'High-Grade Address Discovered',
-    message: 'Sarah Jenkins provided property address 4812 Bordeaux Ave (Grade A - 94/100).',
+    message: 'Sarah Jenkins provided property address 4812 Bordeaux Ave (Grade A - 94/100, Hot 🔥). Cloned into AI Deals.',
     type: 'address_captured',
     timestamp: '5 mins ago',
     read: false,
-    targetPath: 'conversations'
+    targetPath: 'deals'
   },
   {
     id: 'nt-2',
@@ -231,10 +769,20 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     timestamp: '42 mins ago',
     read: false,
     targetPath: 'conversations'
+  },
+  {
+    id: 'nt-3',
+    title: 'Manager Task Created',
+    message: 'Oakridge Dr deal moved to "Need Help". Manager review assigned.',
+    type: 'task_created',
+    timestamp: '1 hour ago',
+    read: false,
+    targetPath: 'tasks'
   }
 ];
 
 export const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   { id: 'aud-1', actor: 'Alexander Vance (Admin)', action: 'Updated Global AI Persona & Instructions', timestamp: 'Today, 09:30 AM', affectedRecord: 'Settings / AI Engine' },
-  { id: 'aud-2', actor: 'Elena Rostova (Manager)', action: 'Reassigned 12 contacts to Marcus Sterling', timestamp: 'Today, 08:15 AM', affectedRecord: 'Contacts Batch #41' }
+  { id: 'aud-2', actor: 'System Automation Engine', action: 'Recycled 4 contacts from 30-Day Nurture to Queued for Outreach', timestamp: 'Today, 08:00 AM', affectedRecord: 'Outreach Pipeline' },
+  { id: 'aud-3', actor: 'Elena Rostova (Manager)', action: 'Reassigned 12 contacts to Marcus Sterling', timestamp: 'Today, 08:15 AM', affectedRecord: 'Contacts Batch #41' }
 ];

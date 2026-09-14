@@ -10,17 +10,32 @@ export interface UserProfile {
   status: 'Active' | 'Deactivated';
 }
 
-export type ContactStatus = 
-  | 'Active in Outreach'
-  | 'Enrolled'
-  | 'Responded'
-  | 'Engaged'
-  | 'Escalated'
-  | 'Declined'
-  | 'Opted Out'
-  | 'Do Not Contact'
-  | 'Archived';
+export type OutreachStage = 
+  | 'Queued for Outreach'
+  | 'Outreach Sent'
+  | 'Responded/Qualifying'
+  | 'Needs Human Touch'
+  | 'Lead Created'
+  | 'No Response, In 30-Day Nurture'
+  | 'Not Interested - CLOSED'
+  | 'Wrong Number / Not an Agent - CLOSED'
+  | 'Opted Out / DND - CLOSED'
+  | 'SMS Error - CLOSED';
+
+export type ContactStatus = OutreachStage;
+
+export type ContactTemperature = 'Hot' | 'Warm' | 'Cold';
 export type Grade = 'A' | 'B' | 'C' | 'D';
+
+export interface OutreachSequenceInfo {
+  currentTouch: number; // 1 to 5
+  totalTouches: number; // 5
+  nurtureDay: number;   // 1 to 30
+  recycleCount: number; // number of times recycled back to queued
+  lastTouchDate: string;
+  nextScheduledTouch?: string;
+  channel: 'sms' | 'email' | 'omnichannel';
+}
 
 export interface RealtorContact {
   id: string;
@@ -30,7 +45,10 @@ export interface RealtorContact {
   email: string;
   phone: string;
   market: string;
-  status: ContactStatus;
+  status: OutreachStage;
+  outreachStage: OutreachStage;
+  temperature: ContactTemperature;
+  sequenceInfo: OutreachSequenceInfo;
   ownerId: string;
   ownerName: string;
   tags: string[];
@@ -40,12 +58,36 @@ export interface RealtorContact {
   score: number;
   notes: string[];
   isArchived?: boolean;
+  propertyDealIds?: string[];
+}
+
+export type TaskType = 'human_touch' | 'lead_created' | 'need_help' | 'phone_call' | 'general';
+export type TaskPriority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface CRMTask {
+  id: string;
+  title: string;
+  description: string;
+  type: TaskType;
+  priority: TaskPriority;
+  status: TaskStatus;
+  assignedToId: string;
+  assignedToName: string;
+  dueDate: string;
+  relatedContactId?: string;
+  relatedContactName?: string;
+  relatedDealId?: string;
+  relatedDealAddress?: string;
+  relatedConversationId?: string;
+  createdAt: string;
+  completedAt?: string;
 }
 
 export interface ActivityEvent {
   id: string;
   contactId: string;
-  type: 'email_sent' | 'sms_sent' | 'email_reply' | 'sms_reply' | 'ai_response' | 'human_response' | 'call' | 'note' | 'status_change' | 'assignment_change';
+  type: 'email_sent' | 'sms_sent' | 'email_reply' | 'sms_reply' | 'ai_response' | 'human_response' | 'call' | 'note' | 'status_change' | 'assignment_change' | 'recycle' | 'task_created';
   title: string;
   description: string;
   timestamp: string;
@@ -74,8 +116,10 @@ export interface Conversation {
   timestamp: string;
   grade: Grade;
   score: number;
+  temperature: ContactTemperature;
   gradeReason: string;
   status: 'Needs Human' | 'Leads With Address' | 'Interested' | 'Not Interested' | 'Questions' | 'Wants Call' | 'Unclear' | 'Opt-out' | 'Assigned';
+  outreachStage: OutreachStage;
   aiStatus: AIStatus;
   assignedOwnerId?: string;
   assignedOwnerName?: string;
@@ -97,7 +141,15 @@ export interface Conversation {
   };
 }
 
-export type DealStage = 'New Property' | 'Qualifying' | 'Offer Made' | 'Offer Accepted' | 'Offer Rejected' | 'Trash' | 'Duplicate Lead' | 'Need Help';
+export type DealStage = 
+  | 'New Property' 
+  | 'Qualifying' 
+  | 'Offer Made' 
+  | 'Offer Accepted' 
+  | 'Offer Rejected' 
+  | 'TRASH' 
+  | 'Duplicate Lead' 
+  | 'Need Help';
 
 export interface PropertyDeal {
   id: string;
@@ -119,6 +171,7 @@ export interface PropertyDeal {
   ownerName: string;
   grade: Grade;
   score: number;
+  temperature?: ContactTemperature;
   realtorName: string;
   realtorBrokerage: string;
   realtorPhone: string;
@@ -157,11 +210,47 @@ export interface PropertyDeal {
   }>;
 }
 
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  category: '5_touch_cadence' | '30_day_nurture' | 'deal_offers' | 'general';
+  touchNumber?: number;
+  channel: 'sms' | 'email';
+  subject?: string;
+  body: string;
+  variables: string[];
+  lastUpdated: string;
+}
+
+export interface WorkflowRule {
+  id: string;
+  name: string;
+  description: string;
+  trigger: string;
+  condition: string;
+  actions: string[];
+  isActive: boolean;
+  executionCount: number;
+  lastExecuted: string;
+}
+
+export interface AIPersonalityConfig {
+  personaName: string;
+  tone: 'institutional' | 'direct' | 'consultative' | 'friendly';
+  systemInstructions: string;
+  creativityTemperature: number;
+  autoGradeHotCriteria: string[];
+  autoGradeWarmCriteria: string[];
+  autoGradeColdCriteria: string[];
+  maxConsecutiveReplies: number;
+  pauseOnPhoneCall: boolean;
+}
+
 export interface AppNotification {
   id: string;
   title: string;
   message: string;
-  type: 'lead_assigned' | 'conversation_escalated' | 'address_captured' | 'integration_alert' | 'system';
+  type: 'lead_assigned' | 'conversation_escalated' | 'address_captured' | 'integration_alert' | 'system' | 'task_created';
   timestamp: string;
   read: boolean;
   targetPath?: string;
