@@ -120,8 +120,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<UserProfile[]>(MOCK_USERS);
   const [currentUser, setCurrentUser] = useState<UserProfile>(MOCK_USERS[0]); // Admin default
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  
   const [contacts, setContacts] = useState<RealtorContact[]>(INITIAL_CONTACTS);
   const [conversations, setConversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
   const [activeConversationId, setActiveConversationId] = useState<string | null>('conv-1');
