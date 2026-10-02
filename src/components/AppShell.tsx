@@ -78,7 +78,7 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FBFF] text-[#0F172A] flex flex-col font-sans antialiased">
+    <div className="h-screen bg-[#F8FBFF] text-[#0F172A] flex flex-col font-sans antialiased overflow-hidden">
 
       {/* TOP HEADER */}
       <header className="h-16 border-b border-[#E2EAF5] bg-white sticky top-0 z-30 flex items-center justify-between px-4 lg:px-6 shadow-xs">
@@ -275,18 +275,17 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
             })}
           </div>
 
-          {/* Luxury Sidebar Bottom Status Card */}
-          {!collapsed && (
-            <div className="p-3 mx-3 mb-4 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm relative z-10">
-              <div className="flex items-center gap-2 text-[11px] font-bold text-white mb-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                <span>AI Outreach Live</span>
-              </div>
-              <div className="text-[10px] text-[#94A3B8] leading-tight">
-                5-Touch Sequence & 30-Day Nurture Active
-              </div>
-            </div>
-          )}
+          {/* Logout Button */}
+          <div className="px-3 pb-4 pt-2 mt-auto relative z-10">
+            <button
+              onClick={() => logout()}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-[#1E294B] text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#EF4444]/10 hover:border-[#EF4444]/30 ${collapsed ? 'px-0' : 'px-3'}`}
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+              {!collapsed && <span>Sign Out</span>}
+            </button>
+          </div>
         </aside>
 
         {/* MOBILE DRAWER */}
@@ -297,7 +296,7 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                 <div className="font-extrabold text-white">APEX <span className="text-[#60A5FA]">ACQUIRE</span></div>
                 <button onClick={() => setMobileDrawerOpen(false)} className="text-[#94A3B8] hover:text-white">✕</button>
               </div>
-              <div className="flex-1 py-4 space-y-2">
+              <div className="flex-1 py-4 space-y-2 overflow-y-auto">
                 {visibleNavItems.map((item) => (
                   <button
                     key={item.id}
@@ -310,6 +309,15 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                     <span>{item.label}</span>
                   </button>
                 ))}
+              </div>
+              <div className="mt-auto pt-4 border-t border-white/10">
+                <button
+                  onClick={() => logout()}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all border border-[#1E294B] text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#EF4444]/10 hover:border-[#EF4444]/30"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
               </div>
             </div>
             <div className="flex-1" onClick={() => setMobileDrawerOpen(false)} />
