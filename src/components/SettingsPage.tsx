@@ -1,46 +1,67 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/crm';
-import { 
-  Save, 
-  Bot, 
-  Sliders, 
-  Shield, 
-  Users, 
-  Check, 
-  UserPlus, 
-  X,
-  Sparkles
-} from 'lucide-react';
+import { Save, Bot, Sliders, Shield, Users, Check, UserPlus, X } from 'lucide-react';
+import { IntegrationSettingsTab } from './IntegrationSettingsTab';
 
 export const SettingsPage: React.FC = () => {
-  const { 
-    settings, 
-    updateSettings, 
-    users, 
-    addUser, 
-    toggleUserStatus, 
-    currentUser 
-  } = useApp();
+  const { settings, updateSettings, users, addUser, toggleUserStatus, currentUser } = useApp();
   
   const isAdmin = currentUser.role === 'ADMIN';
+  const isManager = currentUser.role === 'MANAGER';
 
   // STRICT TAB FILTERING FOR SETTINGS:
+  // Admin sees: AI, Outreach, Grading, Pipeline, Templates, Users & Roles, Integrations
+  // Manager sees ONLY: AI, Outreach, Grading, Pipeline, Templates
   const allTabs = [
     { id: 'ai', label: 'AI Persona & Rules', icon: Bot, roles: ['ADMIN', 'MANAGER'] },
     { id: 'general', label: 'Outreach & Throttles', icon: Sliders, roles: ['ADMIN', 'MANAGER'] },
     { id: 'grading', label: 'Grading Weights', icon: Shield, roles: ['ADMIN', 'MANAGER'] },
-    { id: 'users', label: 'Users & Roles (RBAC)', icon: Users, roles: ['ADMIN'] }
+    { id: 'users', label: 'Users & Roles (RBAC)', icon: Users, roles: ['ADMIN'] },
+    { id: 'integrations', label: 'Integrations & Gateways', icon: Sliders, roles: ['ADMIN'] }
   ];
 
   const visibleTabs = allTabs.filter(t => t.roles.includes(currentUser.role));
   const [activeTab, setActiveTab] = useState<string>('ai');
 
   // Form local state
-  const [instructions, setInstructions] = useState(settings.aiInstructions);
-  const [maxReplies, setMaxReplies] = useState(settings.aiMaxConsecutiveReplies);
-  const [cadenceDays, setCadenceDays] = useState(settings.cadenceIntervalDays);
+  const [instructions, setInstructions] = useState('');
+  const [maxReplies, setMaxReplies] = useState(4);
+  const [cadenceDays, setCadenceDays] = useState(30);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [apiSettings, setApiSettings] = useState<any>(null);
+  const [apiUsers, setApiUsers] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [setRes, usrRes] = await Promise.all([
+          fetch('http://localhost:5000/api/v1/settings', { headers }),
+          fetch('http://localhost:5000/api/v1/users', { headers })
+        ]);
+
+        const setJson = await setRes.json();
+        const usrJson = await usrRes.json();
+
+        if (setJson.success && setJson.data) {
+          setApiSettings(setJson.data);
+          setInstructions(setJson.data.aiPersonaInstructions || '');
+          setMaxReplies(setJson.data.aiConsecutiveReplyCap || 4);
+          setCadenceDays(setJson.data.cadenceRetouchIntervalDays || 30);
+        }
+
+        if (usrJson.success) {
+          setApiUsers(usrJson.data);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchData();
+  }, []);
 
   // User Management Modal State (Admin Only)
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -51,42 +72,50 @@ export const SettingsPage: React.FC = () => {
 
   const safeActiveTab = visibleTabs.some(t => t.id === activeTab) ? activeTab : 'ai';
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
-      aiInstructions: instructions,
-      aiMaxConsecutiveReplies: maxReplies,
-      cadenceIntervalDays: cadenceDays
-    });
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch('http://localhost:5000/api/v1/settings', {
+        method: 'PUT',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          aiPersonaInstructions: instructions,
+          aiConsecutiveReplyCap: maxReplies,
+          cadenceRetouchIntervalDays: cadenceDays
+        })
+      });
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserName.trim() || !newUserEmail.trim()) return;
-
     addUser({
       name: newUserName,
       email: newUserEmail,
       role: newUserRole,
+      avatar: newUserName.substring(0, 2).toUpperCase(),
       title: newUserTitle,
-      status: 'Active',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
+      status: 'Active'
     });
-
+    setShowAddUserModal(false);
     setNewUserName('');
     setNewUserEmail('');
-    setNewUserTitle('Acquisition Agent');
-    setNewUserRole('AGENT');
-    setShowAddUserModal(false);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-5xl">
+    <div className="space-y-8 max-w-5xl mx-auto pb-12">
+      
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] flex items-center gap-2">
+        <h1 className="text-2xl font-bold tracking-tight text-[#0B1F3A] flex items-center gap-2">
           CRM & AI Engine Settings
         </h1>
         <p className="text-xs text-[#475569] mt-1">
@@ -94,7 +123,7 @@ export const SettingsPage: React.FC = () => {
         </p>
       </div>
 
-      {/* TAB NAVIGATION */}
+      {/* TAB NAVIGATION - RESTRICTED BASED ON ROLE */}
       <div className="flex border-b border-[#E2E8F0] space-x-6 overflow-x-auto">
         {visibleTabs.map((t) => (
           <button
@@ -109,11 +138,16 @@ export const SettingsPage: React.FC = () => {
         ))}
       </div>
 
-      {/* TAB: USER MANAGEMENT (ADMIN ONLY) */}
+      {/* TAB: INTEGRATIONS VIEW (ADMIN ONLY - MANAGER CANNOT SEE THIS TAB AT ALL) */}
+      {safeActiveTab === 'integrations' && isAdmin && (
+        <IntegrationSettingsTab />
+      )}
+
+      {/* TAB: USER MANAGEMENT (ADMIN ONLY - MANAGER CANNOT SEE THIS TAB AT ALL) */}
       {safeActiveTab === 'users' && isAdmin && (
-        <div className="executive-panel rounded-2xl p-6 space-y-4 shadow-sm border border-[#E2E8F0] bg-white">
+        <div className="executive-panel rounded-2xl p-6 space-y-4 shadow-sm border border-[#E2E8F0]">
           <div className="flex justify-between items-center pb-2 border-b border-[#E2E8F0]">
-            <h3 className="text-xs font-bold text-[#0B1F3A] uppercase tracking-wider">Active System Users ({users.length})</h3>
+            <h3 className="text-xs font-bold text-[#0B1F3A] uppercase tracking-wider">Active System Users ({apiUsers.length})</h3>
             <button
               onClick={() => setShowAddUserModal(true)}
               className="px-3.5 py-1.5 btn-executive-primary text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
@@ -123,26 +157,26 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {users.map((u) => (
+            {apiUsers.map((u) => (
               <div key={u.id} className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between text-xs shadow-sm">
                 <div>
                   <div className="font-bold text-[#0F172A] flex items-center gap-2">
-                    {u.name}
+                    {u.firstName} {u.lastName}
                     <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#EAF2FF] text-[#155EEF] border border-[#155EEF]/20">
                       {u.role}
                     </span>
                   </div>
-                  <div className="text-[10px] text-[#475569]">{u.email} &bull; {u.title}</div>
+                  <div className="text-[10px] text-[#475569]">{u.email} &bull; {u.jobTitle || 'Acquisition Agent'}</div>
                 </div>
 
                 {u.id !== currentUser.id && (
                   <button
                     onClick={() => toggleUserStatus(u.id)}
                     className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
-                      u.status === 'Active' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                     }`}
                   >
-                    {u.status === 'Active' ? 'Deactivate User' : 'Reactivate User'}
+                    {u.status === 'ACTIVE' ? 'Deactivate User' : 'Reactivate User'}
                   </button>
                 )}
               </div>
@@ -153,7 +187,7 @@ export const SettingsPage: React.FC = () => {
 
       {/* FORM BODY FOR COMMON SETTINGS (AI, OUTREACH, GRADING) */}
       {(safeActiveTab === 'ai' || safeActiveTab === 'general' || safeActiveTab === 'grading') && (
-        <form onSubmit={handleSaveSettings} className="executive-panel rounded-2xl p-6 space-y-6 shadow-sm border border-[#E2E8F0] bg-white">
+        <form onSubmit={handleSaveSettings} className="executive-panel rounded-2xl p-6 space-y-6 shadow-sm border border-[#E2E8F0]">
           
           {safeActiveTab === 'ai' && (
             <div className="space-y-4 text-xs">
@@ -163,7 +197,7 @@ export const SettingsPage: React.FC = () => {
                   rows={5}
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
-                  className="w-full p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] font-mono text-xs focus:outline-none focus:border-[#155EEF] shadow-xs"
+                  className="w-full p-3.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] font-mono text-xs focus:outline-none focus:border-[#155EEF] shadow-sm"
                 />
               </div>
 
@@ -173,7 +207,7 @@ export const SettingsPage: React.FC = () => {
                   type="number"
                   value={maxReplies}
                   onChange={(e) => setMaxReplies(Number(e.target.value))}
-                  className="w-32 p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] font-mono focus:outline-none focus:border-[#155EEF] shadow-xs"
+                  className="w-32 p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] font-mono focus:outline-none focus:border-[#155EEF] shadow-sm"
                 />
               </div>
             </div>
@@ -187,7 +221,7 @@ export const SettingsPage: React.FC = () => {
                   type="number"
                   value={cadenceDays}
                   onChange={(e) => setCadenceDays(Number(e.target.value))}
-                  className="w-32 p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A] font-mono focus:outline-none focus:border-[#155EEF] shadow-xs"
+                  className="w-32 p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] font-mono focus:outline-none focus:border-[#155EEF] shadow-sm"
                 />
               </div>
             </div>
@@ -199,11 +233,11 @@ export const SettingsPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                   <span className="text-[#64748B] block text-[10px] uppercase font-bold">Address Captured</span>
-                  <strong className="text-[#155EEF] text-sm font-mono">{settings.gradeWeights.address}% Weight</strong>
+                  <strong className="text-[#155EEF] text-sm font-mono">{apiSettings?.gradingWeightAddress || 35}% Weight</strong>
                 </div>
                 <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                   <span className="text-[#64748B] block text-[10px] uppercase font-bold">Price Response</span>
-                  <strong className="text-[#155EEF] text-sm font-mono">{settings.gradeWeights.price}% Weight</strong>
+                  <strong className="text-[#155EEF] text-sm font-mono">{apiSettings?.gradingWeightPrice || 20}% Weight</strong>
                 </div>
               </div>
             </div>
@@ -229,83 +263,61 @@ export const SettingsPage: React.FC = () => {
 
       {/* ADD USER MODAL (ADMIN ONLY) */}
       {showAddUserModal && isAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B1533]/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-[#E2E8F0]">
-            <div className="px-6 py-4 bg-[#F8FAFC] border-b border-[#E2E8F0] flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#0B1F3A]">Add New CRM Team Member</h3>
-              <button onClick={() => setShowAddUserModal(false)} className="text-[#64748B] hover:text-[#0F172A]"><X className="w-4 h-4" /></button>
-            </div>
-
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="executive-panel w-full max-w-md rounded-2xl p-6 relative space-y-4 shadow-2xl border border-[#E2E8F0]">
+            <button onClick={() => setShowAddUserModal(false)} className="absolute top-5 right-5 text-[#64748B] hover:text-[#0F172A]">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-[#0B1F3A]">Add System User</h3>
+            
+            <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-[#475569] mb-1">Full Name</label>
+                <label className="block text-[#475569] font-semibold mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="e.g. Rachel Adams"
-                  className="w-full p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A]"
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-[#475569] mb-1">Corporate Email</label>
+                <label className="block text-[#475569] font-semibold mb-1">Work Email</label>
                 <input
                   type="email"
                   required
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
-                  placeholder="rachel@apexacquire.com"
-                  className="w-full p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A]"
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#475569] mb-1">Assigned Role</label>
-                  <select
-                    value={newUserRole}
-                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                    className="w-full p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A]"
-                  >
-                    <option value="AGENT">AGENT</option>
-                    <option value="MANAGER">MANAGER</option>
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="READ_ONLY">READ_ONLY</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-[#475569] mb-1">Job Title</label>
-                  <input
-                    type="text"
-                    value={newUserTitle}
-                    onChange={(e) => setNewUserTitle(e.target.value)}
-                    placeholder="Acquisitions Agent"
-                    className="w-full p-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-[#0F172A]"
-                  />
-                </div>
+              <div>
+                <label className="block text-[#475569] font-semibold mb-1">Role Assignment</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm cursor-pointer"
+                >
+                  <option value="ADMIN">ADMIN (Full Access)</option>
+                  <option value="MANAGER">MANAGER (Team Workload)</option>
+                  <option value="AGENT">AGENT (Assigned Work)</option>
+                  <option value="READ_ONLY">READ_ONLY (View Only)</option>
+                </select>
               </div>
 
-              <div className="pt-3 border-t border-[#E2E8F0] flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddUserModal(false)}
-                  className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-xs font-bold text-[#64748B] hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 btn-executive-primary text-white font-bold rounded-xl text-xs shadow-md cursor-pointer"
-                >
-                  Create User
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="w-full py-3 btn-executive-primary text-white font-bold rounded-xl mt-3 transition-all shadow-md cursor-pointer"
+              >
+                Create User & Assign Role
+              </button>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 };

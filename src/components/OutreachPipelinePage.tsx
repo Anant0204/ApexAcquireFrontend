@@ -157,13 +157,32 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
   const [recycledToast, setRecycledToast] = useState<string | null>(null);
   const [activeJumpStage, setActiveJumpStage] = useState<OutreachStage | null>(null);
 
-  const activeContacts = contacts.filter(c => !c.isArchived);
+  const [apiContacts, setApiContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredContacts = activeContacts.filter(c => {
+  React.useEffect(() => {
+    const fetchPipeline = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/outreach/pipeline', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiContacts(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPipeline();
+  }, []);
+
+  const filteredContacts = apiContacts.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.brokerage.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search) ||
-      c.market.toLowerCase().includes(search.toLowerCase());
+      (c.market && c.market.toLowerCase().includes(search.toLowerCase()));
 
     const matchesTemp = temperatureFilter === 'ALL' || c.temperature === temperatureFilter;
     return matchesSearch && matchesTemp;
@@ -203,6 +222,10 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
   };
 
   const isReadOnly = currentUser.role === 'READ_ONLY';
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Outreach Pipeline...</div>;
+  }
 
   return (
     <div className="space-y-5 max-w-full pb-12">

@@ -61,37 +61,20 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
   const [showCsvWizard, setShowCsvWizard] = useState(false);
   const [csvStep, setCsvStep] = useState<1 | 2 | 3>(1);
 
-  const [formData, setFormData] = useState<{
-    name: string;
-    licenseNumber: string;
-    brokerage: string;
-    email: string;
-    phone: string;
-    market: string;
-    status: OutreachStage;
-    outreachStage: OutreachStage;
-    temperature: ContactTemperature;
-    ownerId: string;
-    ownerName: string;
-    tags: string[];
-    grade: Grade;
-    score: number;
-    sequenceInfo: RealtorContact['sequenceInfo'];
-    propertyDealIds: string[];
-  }>({
+  const [formData, setFormData] = useState({
     name: '',
     licenseNumber: '',
     brokerage: '',
     email: '',
     phone: '',
     market: 'Dallas Metro',
-    status: 'Queued for Outreach',
-    outreachStage: 'Queued for Outreach',
-    temperature: 'Warm',
+    status: 'Queued for Outreach' as OutreachStage,
+    outreachStage: 'Queued for Outreach' as OutreachStage,
+    temperature: 'Warm' as ContactTemperature,
     ownerId: currentUser.id,
     ownerName: currentUser.name,
     tags: ['Realtor Directory'],
-    grade: 'B',
+    grade: 'B' as Grade,
     score: 75,
     sequenceInfo: {
       currentTouch: 0,
@@ -100,13 +83,33 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
       recycleCount: 0,
       lastTouchDate: 'Never',
       nextScheduledTouch: 'Touch 1 Ready',
-      channel: 'sms'
+      channel: 'sms' as const
     },
     propertyDealIds: []
   });
 
+  const [apiContacts, setApiContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const activeContacts = contacts.filter(c => !c.isArchived);
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/contacts', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiContacts(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  const activeContacts = apiContacts.filter(c => !c.isArchived);
 
   const filteredContacts = activeContacts.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -119,6 +122,10 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
 
     return matchesSearch && matchesStage && matchesTemp;
   });
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Contacts Directory...</div>;
+  }
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {

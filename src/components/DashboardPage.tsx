@@ -9,28 +9,37 @@ interface DashboardProps {
 export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { contacts, conversations, deals, currentUser } = useApp();
 
-  const activeContacts = contacts.filter(c => !c.isArchived);
-  const activeDeals = deals.filter(d => !d.isArchived);
+  const [metrics, setMetrics] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const totalContacts = activeContacts.length;
-  const activeOutreach = activeContacts.filter(c => c.outreachStage === 'Outreach Sent' || c.outreachStage === 'Responded/Qualifying' || c.outreachStage === 'Queued for Outreach').length;
-  const optedOut = activeContacts.filter(c => c.outreachStage === 'Opted Out / DND - CLOSED' || c.outreachStage === 'Not Interested - CLOSED' || c.outreachStage === 'Wrong Number / Not an Agent - CLOSED' || c.outreachStage === 'SMS Error - CLOSED').length;
-
-
-  const totalDealsCount = activeDeals.length;
-  const activePipelineValue = activeDeals.reduce((acc, d) => acc + d.askingPrice, 0);
-
-  const gradeACount = conversations.filter(c => c.grade === 'A').length;
-  const gradeBCount = conversations.filter(c => c.grade === 'B').length;
-  const gradeCCount = conversations.filter(c => c.grade === 'C').length;
-  const gradeDCount = conversations.filter(c => c.grade === 'D').length;
-
-  const needsHumanCount = conversations.filter(c => c.status === 'Needs Human').length;
-  const leadsWithAddressCount = conversations.filter(c => c.status === 'Leads With Address').length;
+  React.useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/dashboard/metrics', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setMetrics(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
 
   const isAgent = currentUser.role === 'AGENT';
   const isReadOnly = currentUser.role === 'READ_ONLY';
   const isManager = currentUser.role === 'MANAGER';
+
+  if (loading || !metrics) {
+    return <div className="p-6 text-center text-[#475569]">Loading Dashboard Telemetry...</div>;
+  }
+
+  const { metrics: m, activity: a, inbox: i, pipeline: p, aiTelemetry: ai, priorityQueue } = metrics;
+
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -85,12 +94,12 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
               Metrics
             </span>
           </div>
-          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">{totalContacts}</div>
+          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">{m.totalContacts}</div>
           <div className="text-xs font-bold text-[#475569] mt-0.5">Total Realtor Contacts</div>
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#E2EAF5] text-[11px] text-[#64748B]">
-            <span><strong className="text-[#16A34A]">{activeOutreach}</strong> Active</span>
+            <span><strong className="text-[#16A34A]">{m.activeContacts}</strong> Active</span>
             <span>&bull;</span>
-            <span><strong className="text-[#64748B]">{optedOut}</strong> Opt-out</span>
+            <span><strong className="text-[#64748B]">{m.optOutContacts}</strong> Opt-out</span>
           </div>
         </div>
 
@@ -105,12 +114,12 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
               Activity
             </span>
           </div>
-          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">1,482</div>
+          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">{a.outreachDispatched}</div>
           <div className="text-xs font-bold text-[#475569] mt-0.5">Outreach Dispatched (24h)</div>
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#E2EAF5] text-[11px] text-[#64748B]">
-            <span>Reply Rate: <strong className="text-[#16A34A]">18.4%</strong></span>
+            <span>Reply Rate: <strong className="text-[#16A34A]">{a.replyRate}%</strong></span>
             <span>&bull;</span>
-            <span>SMS: 84%</span>
+            <span>SMS: {a.smsPercentage}%</span>
           </div>
         </div>
 
@@ -125,12 +134,12 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
               Inbox
             </span>
           </div>
-          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">{conversations.length}</div>
+          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">{i.activeThreads}</div>
           <div className="text-xs font-bold text-[#475569] mt-0.5">Active Dialog Threads</div>
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#E2EAF5] text-[11px] text-[#64748B]">
-            <span><strong className="text-[#155EEF]">{needsHumanCount}</strong> Needs Human</span>
+            <span><strong className="text-[#155EEF]">{i.needsHuman}</strong> Needs Human</span>
             <span>&bull;</span>
-            <span><strong className="text-[#16A34A]">{leadsWithAddressCount}</strong> Addresses</span>
+            <span><strong className="text-[#16A34A]">{i.addresses}</strong> Addresses</span>
           </div>
         </div>
 
@@ -145,10 +154,10 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
               Pipeline
             </span>
           </div>
-          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">${(activePipelineValue / 1000000).toFixed(2)}M</div>
+          <div className="text-3xl font-extrabold text-[#0B1F3A] font-mono tracking-tight">${(p.activeDealsVolume / 1000000).toFixed(2)}M</div>
           <div className="text-xs font-bold text-[#475569] mt-0.5">Active Deals Volume</div>
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#E2EAF5] text-[11px] text-[#64748B]">
-            <span><strong className="text-[#16A34A]">{totalDealsCount}</strong> Active Deals</span>
+            <span><strong className="text-[#16A34A]">{p.activeDealsCount}</strong> Active Deals</span>
           </div>
         </div>
 
@@ -173,19 +182,19 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 mb-6 text-center">
               <div className="p-2 sm:p-2.5 rounded-xl bg-[#F8FBFF] border border-[#16A34A]/30 shadow-xs">
-                <div className="text-base sm:text-lg font-mono font-bold text-[#16A34A]">{gradeACount}</div>
+                <div className="text-base sm:text-lg font-mono font-bold text-[#16A34A]">{ai.gradeA}</div>
                 <div className="text-[9px] sm:text-[10px] uppercase font-bold text-[#64748B] mt-0.5 whitespace-nowrap">Grade A</div>
               </div>
               <div className="p-2 sm:p-2.5 rounded-xl bg-[#F8FBFF] border border-[#155EEF]/30 shadow-xs">
-                <div className="text-base sm:text-lg font-mono font-bold text-[#155EEF]">{gradeBCount}</div>
+                <div className="text-base sm:text-lg font-mono font-bold text-[#155EEF]">{ai.gradeB}</div>
                 <div className="text-[9px] sm:text-[10px] uppercase font-bold text-[#64748B] mt-0.5 whitespace-nowrap">Grade B</div>
               </div>
               <div className="p-2 sm:p-2.5 rounded-xl bg-[#F8FBFF] border border-[#2563EB]/30 shadow-xs">
-                <div className="text-base sm:text-lg font-mono font-bold text-[#2563EB]">{gradeCCount}</div>
+                <div className="text-base sm:text-lg font-mono font-bold text-[#2563EB]">{ai.gradeC}</div>
                 <div className="text-[9px] sm:text-[10px] uppercase font-bold text-[#64748B] mt-0.5 whitespace-nowrap">Grade C</div>
               </div>
               <div className="p-2 sm:p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E11D48]/30 shadow-xs">
-                <div className="text-base sm:text-lg font-mono font-bold text-[#E11D48]">{gradeDCount}</div>
+                <div className="text-base sm:text-lg font-mono font-bold text-[#E11D48]">{ai.gradeD}</div>
                 <div className="text-[9px] sm:text-[10px] uppercase font-bold text-[#64748B] mt-0.5 whitespace-nowrap">Grade D</div>
               </div>
             </div>
@@ -195,7 +204,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
             <span className="flex items-center gap-2 truncate font-semibold">
               <Sparkles className="w-4 h-4 text-[#155EEF] shrink-0" /> <span className="truncate">AI High-Intent Threads</span>
             </span>
-            <span className="font-extrabold font-mono text-[#155EEF] text-xs sm:text-sm shrink-0">{gradeACount + gradeBCount} Qualified</span>
+            <span className="font-extrabold font-mono text-[#155EEF] text-xs sm:text-sm shrink-0">{ai.qualifiedCount} Qualified</span>
           </div>
         </div>
 
@@ -205,11 +214,11 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="flex items-center gap-2">
               <h3 className="text-xs font-extrabold text-[#0B1F3A] uppercase tracking-wider">Priority Attention Queue</h3>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#155EEF] text-white shrink-0 shadow-xs">
-                {needsHumanCount + leadsWithAddressCount} Items
+                {i.needsHuman + i.addresses} Items
               </span>
             </div>
             {!isReadOnly && (
-              <button onClick={() => onNavigate('conversations')} className="text-xs text-[#155EEF] font-extrabold hover:underline self-start sm:self-auto cursor-pointer">
+              <button onClick={() => onNavigate('leadqueue')} className="text-xs text-[#155EEF] font-extrabold hover:underline self-start sm:self-auto">
                 Open Lead Queue &rarr;
               </button>
             )}

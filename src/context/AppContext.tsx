@@ -221,19 +221,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Switched active view role to ${role}`, 'User Session');
   };
 
-  const login = (email: string, role: UserRole = 'ADMIN') => {
-    const match = users.find(u => u.email.toLowerCase() === email.toLowerCase()) || {
-      id: `usr-${Date.now()}`,
-      name: email.split('@')[0].toUpperCase(),
-      email,
-      role,
-      avatar: email.substring(0, 2).toUpperCase(),
-      title: 'Real Estate Executive',
-      status: 'Active' as const
-    };
-    setCurrentUser(match);
-    setIsAuthenticated(true);
-    logAuditAction(`User logged in as ${match.role}`, `User Profile (${match.email})`);
+  const login = async (email: string, role: UserRole = 'ADMIN') => {
+    try {
+      // In a real app we'd get password from the form, for demo we hardcode the seed password
+      const res = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'password123' })
+      });
+      const data = await res.json();
+      
+      if (data.success && data.data) {
+        const apiUser = data.data.user;
+        const mappedUser: UserProfile = {
+          id: apiUser.id,
+          name: `${apiUser.firstName} ${apiUser.lastName}`,
+          email: apiUser.email,
+          role: apiUser.role as UserRole,
+          avatar: apiUser.firstName.substring(0, 2).toUpperCase(),
+          title: 'Real Estate Executive',
+          status: apiUser.status as 'Active' | 'Deactivated'
+        };
+        setCurrentUser(mappedUser);
+        setIsAuthenticated(true);
+        localStorage.setItem('accessToken', data.data.accessToken);
+        if (data.data.refreshToken) {
+          localStorage.setItem('refreshToken', data.data.refreshToken);
+        }
+        logAuditAction(`User logged in as ${mappedUser.role} via API`, `User Profile (${mappedUser.email})`);
+      } else {
+        alert("Login failed: " + (data.error?.message || "Invalid credentials"));
+      }
+    } catch (err) {
+      console.error("Login API Error:", err);
+      alert("Failed to connect to Backend API. Make sure the backend server is running on port 5000.");
+    }
   };
 
   const logout = () => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import type { Conversation, Grade, ContactTemperature, RealtorContact } from '../types/crm';
+import type { Conversation, Grade, ContactTemperature } from '../types/crm';
 import {
   Bot,
   User,
@@ -16,18 +16,14 @@ import {
   PhoneCall,
   Sparkles,
   CheckCircle2,
-  RotateCcw,
-  ArrowUpRight,
-  ExternalLink,
-  UserCheck
+  RotateCcw
 } from 'lucide-react';
 
 interface ConversationsPageProps {
   onOpenCallModal?: (contact: any) => void;
-  onSelectContact?: (contact: RealtorContact) => void;
 }
 
-export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCallModal, onSelectContact }) => {
+export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCallModal }) => {
   const {
     conversations,
     contacts,
@@ -58,13 +54,34 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
   const [overrideScoreVal, setOverrideScoreVal] = useState<number>(92);
   const [overrideReason, setOverrideReason] = useState('');
 
-  const activeConv = conversations.find(c => c.id === activeConversationId) || conversations[0];
-  const matchingContact = contacts.find(c => c.id === activeConv?.contactId || c.name.toLowerCase() === activeConv?.realtorName?.toLowerCase());
+  const [apiConversations, setApiConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredConversations = conversations.filter(c => {
-    const matchesSearch = c.realtorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.brokerage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.latestMessage.toLowerCase().includes(searchQuery.toLowerCase());
+  React.useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/conversations', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiConversations(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchConversations();
+  }, []);
+
+  const activeConv = apiConversations.find(c => c.id === activeConversationId) || apiConversations[0];
+  const matchingContact = contacts.find(c => c.id === activeConv?.contactId);
+
+  const filteredConversations = apiConversations.filter(c => {
+    const matchesSearch = c.contactName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.realtorBrokerage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory = filterCategory === 'ALL' ? true :
       filterCategory === 'Needs Human' ? c.status === 'Needs Human' || c.outreachStage === 'Needs Human Touch' :
@@ -75,6 +92,10 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
 
     return matchesSearch && matchesCategory && matchesTemp;
   });
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Conversations...</div>;
+  }
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,8 +150,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-
+        <div className="flex items-center gap-2">
           {matchingContact && onOpenCallModal && !isReadOnly && (
             <button
               onClick={() => onOpenCallModal(matchingContact)}
@@ -178,7 +198,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg font-bold uppercase tracking-wider whitespace-nowrap transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
                     filterCategory === cat ? 'bg-[#155EEF] text-white' : 'bg-white text-[#475569] hover:bg-[#EAF2FF] border border-[#E2E8F0]'
                   }`}
                 >
@@ -192,7 +212,6 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
           <div className="flex-1 overflow-y-auto divide-y divide-[#E2E8F0]">
             {filteredConversations.map((conv) => {
               const isSelected = activeConv?.id === conv.id;
-              const convContact = contacts.find(c => c.id === conv.contactId || c.name.toLowerCase() === conv.realtorName.toLowerCase());
 
               return (
                 <div
@@ -201,23 +220,13 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
                     setActiveConversationId(conv.id);
                     setMobileView('chat');
                   }}
-                  className={`p-3.5 cursor-pointer transition-all relative group ${
+                  className={`p-3.5 cursor-pointer transition-all ${
                     isSelected ? 'bg-[#EAF2FF] border-l-4 border-[#155EEF]' : 'hover:bg-[#F8FAFC]'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <span 
-                      onClick={(e) => {
-                        if (convContact && onSelectContact) {
-                          e.stopPropagation();
-                          onSelectContact(convContact);
-                        }
-                      }}
-                      className="font-bold text-xs text-[#0B1F3A] hover:text-[#155EEF] flex items-center gap-1.5 transition-colors"
-                      title="Click to view contact profile"
-                    >
-                      <span>{conv.realtorName}</span>
-                      <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-[#155EEF] transition-opacity" />
+                    <span className="font-bold text-xs text-[#0B1F3A] flex items-center gap-1.5">
+                      {conv.realtorName}
                     </span>
                     <span className="text-[10px] text-[#64748B] font-mono">{conv.timestamp}</span>
                   </div>
@@ -262,7 +271,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
           mobileView === 'chat' ? 'flex h-full' : 'hidden lg:flex'
         }`}>
           
-          {/* Thread Header with Clickable Contact Profile Link */}
+          {/* Thread Header */}
           {activeConv && (
             <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC] flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -273,26 +282,12 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
                   <ArrowLeft className="w-4 h-4" />
                 </button>
 
-                <div
-                  onClick={() => {
-                    if (matchingContact && onSelectContact) {
-                      onSelectContact(matchingContact);
-                    }
-                  }}
-                  className="cursor-pointer group flex flex-col"
-                  title="Click to view full contact details"
-                >
-                  <div className="text-xs font-bold text-[#0B1F3A] group-hover:text-[#155EEF] leading-tight flex items-center gap-1.5 transition-colors">
-                    <span>{activeConv.realtorName}</span>
+                <div>
+                  <div className="text-xs font-bold text-[#0B1F3A] leading-tight flex items-center gap-1.5">
+                    {activeConv.realtorName}
                     <span className="text-[10px] text-[#64748B] font-normal">({activeConv.brokerage})</span>
-                    <span className="text-[10px] text-[#155EEF] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 ml-1">
-                      View Profile <ArrowUpRight className="w-3 h-3" />
-                    </span>
                   </div>
-                  <div className="text-[10px] text-[#64748B] font-mono group-hover:text-[#155EEF] transition-colors flex items-center gap-1">
-                    <span>{activeConv.realtorPhone}</span>
-                    <span className="text-[9px] text-[#155EEF] font-medium hidden sm:inline">(Click to open profile)</span>
-                  </div>
+                  <div className="text-[10px] text-[#64748B] font-mono">{activeConv.realtorPhone}</div>
                 </div>
               </div>
 
@@ -302,7 +297,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
                   <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-[#E2E8F0]">
                     <button
                       onClick={() => toggleAiTakeover(activeConv.id, 'Active')}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
                         activeConv.aiStatus === 'Active' ? 'bg-[#155EEF] text-white shadow-xs' : 'text-[#64748B] hover:text-[#0F172A]'
                       }`}
                     >
@@ -310,7 +305,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
                     </button>
                     <button
                       onClick={() => toggleAiTakeover(activeConv.id, 'Human Takeover')}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
                         activeConv.aiStatus === 'Human Takeover' ? 'bg-[#0B1F3A] text-white shadow-xs' : 'text-[#64748B] hover:text-[#0F172A]'
                       }`}
                     >
@@ -382,25 +377,6 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
           {activeConv && (
             <div className="space-y-4">
               
-              {/* Contact Overview Quick Box with View Details CTA */}
-              <div className="p-3.5 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[#64748B] uppercase font-bold">Contact Profile</span>
-                  <span className="text-[10px] text-[#155EEF] font-mono font-bold">{matchingContact?.licenseNumber || 'Licensed Agent'}</span>
-                </div>
-                <div className="font-bold text-xs text-[#0B1F3A]">{activeConv.realtorName}</div>
-                <div className="text-[11px] text-[#64748B]">{activeConv.brokerage} &bull; {activeConv.realtorPhone}</div>
-                
-                {matchingContact && onSelectContact && (
-                  <button
-                    onClick={() => onSelectContact(matchingContact)}
-                    className="w-full py-2 mt-1 bg-gradient-to-r from-[#0B1F3A] to-[#155EEF] hover:from-[#155EEF] hover:to-[#2563EB] text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <UserCheck className="w-3.5 h-3.5" /> Open Full Contact Details
-                  </button>
-                )}
-              </div>
-
               {/* Temperature Custom Field Dropdown */}
               <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] shadow-2xs space-y-1.5">
                 <label className="text-[10px] text-[#64748B] uppercase font-bold block">
@@ -582,4 +558,3 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
     </div>
   );
 };
-

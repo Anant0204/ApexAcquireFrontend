@@ -134,42 +134,7 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
             </button>
           )}
 
-          {/* Quick Role Switcher Pill */}
-          <div className="relative z-50">
-            <button
-              onClick={() => {
-                setShowRoleSelector(!showRoleSelector);
-                setShowNotifications(false);
-                setShowProfileMenu(false);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#E2EAF5] bg-[#F1F6FC] hover:bg-[#EAF2FF] text-[#0B1F3A] text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
-            >
-              <Shield className="w-3.5 h-3.5 text-[#155EEF]" />
-              <span>ROLE: {currentUser.role.replace('_', ' ')}</span>
-            </button>
 
-            {showRoleSelector && (
-              <div className="absolute right-0 mt-2 w-52 bg-white border border-[#E2EAF5] rounded-xl shadow-xl p-1.5 z-50">
-                <div className="px-2 py-1 text-[10px] uppercase font-bold text-[#64748B] border-b border-[#E2EAF5] mb-1">
-                  Switch Active Persona
-                </div>
-                {(['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => {
-                      setCurrentUserRole(r);
-                      setShowRoleSelector(false);
-                    }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-colors ${currentUser.role === r ? 'bg-[#EAF2FF] text-[#155EEF] font-bold' : 'text-[#475569] hover:bg-[#F1F6FC]'
-                      }`}
-                  >
-                    <span>{r.replace('_', ' ')}</span>
-                    {currentUser.role === r && <Check className="w-3.5 h-3.5 text-[#155EEF]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Notifications Bell */}
           <div className="relative z-50">
