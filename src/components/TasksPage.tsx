@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import type { CRMTask, TaskType, TaskPriority } from '../types/crm';
 import {
   CheckCircle2,
   Clock,

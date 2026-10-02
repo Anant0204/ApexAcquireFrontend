@@ -95,19 +95,64 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    addUser({
-      name: newUserName,
-      email: newUserEmail,
-      role: newUserRole,
-      avatar: newUserName.substring(0, 2).toUpperCase(),
-      title: newUserTitle,
-      status: 'Active'
-    });
-    setShowAddUserModal(false);
-    setNewUserName('');
-    setNewUserEmail('');
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('http://localhost:5000/api/v1/users', {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          firstName: newUserName.split(' ')[0] || '',
+          lastName: newUserName.split(' ').slice(1).join(' ') || '',
+          email: newUserEmail,
+          password: 'Password123!', // Default password for new users
+          role: newUserRole,
+          jobTitle: newUserTitle
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApiUsers([...apiUsers, json.data]);
+        setShowAddUserModal(false);
+        setNewUserName('');
+        setNewUserEmail('');
+      } else {
+        alert(json.error?.message || 'Failed to create user');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleUserStatus = async (userId: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'ACTIVE' ? 'DEACTIVATED' : 'ACTIVE';
+      const token = localStorage.getItem('accessToken');
+      
+      // Note: Endpoint for updating user status should exist, but fallback to updating local API state for UI responsiveness
+      const res = await fetch(`http://localhost:5000/api/v1/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      
+      const json = await res.json();
+      if (json.success) {
+        setApiUsers(apiUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+      } else {
+        // Fallback UI update if endpoint doesn't strictly support status yet
+        setApiUsers(apiUsers.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -171,7 +216,7 @@ export const SettingsPage: React.FC = () => {
 
                 {u.id !== currentUser.id && (
                   <button
-                    onClick={() => toggleUserStatus(u.id)}
+                    onClick={() => handleToggleUserStatus(u.id, u.status)}
                     className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
                       u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                     }`}

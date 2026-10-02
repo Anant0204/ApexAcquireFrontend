@@ -239,33 +239,39 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
 
           <div className="space-y-3">
-            {conversations.slice(0, 3).map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => onNavigate('conversations', conv.id)}
-                className="p-3.5 rounded-xl bg-[#F8FBFF] border border-[#E2EAF5] hover:border-[#155EEF] hover:bg-[#F0F6FF] transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group shadow-xs hover:shadow-md"
-              >
-                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-lg bg-white text-[#155EEF] font-extrabold text-xs flex items-center justify-center border border-[#BFDBFE] shrink-0 mt-0.5 sm:mt-0 shadow-xs">
-                    {conv.grade}
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="text-xs font-bold text-[#0B1F3A] flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      <span>{conv.realtorName}</span>
-                      <span className="text-[#64748B] hidden sm:inline">&bull;</span>
-                      <span className="text-[#475569] font-normal text-[11px] sm:text-xs">({conv.brokerage})</span>
-                    </div>
-                    <div className="text-[11px] text-[#475569] truncate italic">
-                      "{conv.latestMessage}"
-                    </div>
-                  </div>
-                </div>
-
-                <span className="self-start sm:self-center shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE] whitespace-nowrap shadow-xs">
-                  {conv.status}
-                </span>
+            {priorityQueue.length === 0 ? (
+              <div className="p-6 rounded-xl border border-dashed border-[#E2EAF5] text-center text-[#64748B] text-xs font-semibold">
+                No priority items requiring attention.
               </div>
-            ))}
+            ) : (
+              priorityQueue.map((conv: any) => (
+                <div
+                  key={conv.id}
+                  onClick={() => onNavigate('conversations', conv.id)}
+                  className="p-3.5 rounded-xl bg-[#F8FBFF] border border-[#E2EAF5] hover:border-[#155EEF] hover:bg-[#F0F6FF] transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group shadow-xs hover:shadow-md"
+                >
+                  <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                    <div className="w-8 h-8 rounded-lg bg-white text-[#155EEF] font-extrabold text-xs flex items-center justify-center border border-[#BFDBFE] shrink-0 mt-0.5 sm:mt-0 shadow-xs">
+                      {conv.grade}
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="text-xs font-bold text-[#0B1F3A] flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                        <span>{conv.realtorName}</span>
+                        <span className="text-[#64748B] hidden sm:inline">&bull;</span>
+                        <span className="text-[#475569] font-normal text-[11px] sm:text-xs">({conv.brokerage})</span>
+                      </div>
+                      <div className="text-[11px] text-[#475569] truncate italic">
+                        "{conv.latestMessage}"
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="self-start sm:self-center shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE] whitespace-nowrap shadow-xs">
+                    {conv.tag}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
