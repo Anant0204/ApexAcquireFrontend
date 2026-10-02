@@ -47,15 +47,46 @@ export const TemplatesAutomationsPage: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // AI Config Form State
-  const [aiPersonaName, setAiPersonaName] = useState(aiConfig.personaName);
-  const [aiTone, setAiTone] = useState(aiConfig.tone);
-  const [aiInstructions, setAiInstructions] = useState(aiConfig.systemInstructions);
-  const [aiCreativity, setAiCreativity] = useState(aiConfig.creativityTemperature);
-  const [aiMaxReplies, setAiMaxReplies] = useState(aiConfig.maxConsecutiveReplies);
+  const [aiPersonaName, setAiPersonaName] = useState('Institutional Buyer (Default)');
+  const [aiTone, setAiTone] = useState('direct');
+  const [aiInstructions, setAiInstructions] = useState('');
+  const [aiCreativity, setAiCreativity] = useState(0.2);
+  const [aiMaxReplies, setAiMaxReplies] = useState(4);
   const [aiSavedToast, setAiSavedToast] = useState(false);
 
+  const [apiTemplates, setApiTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchTemplatesAndSettings = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const headers = { Authorization: `Bearer ${token}` };
+        
+        const [tplRes, setRes] = await Promise.all([
+          fetch('http://localhost:5000/api/v1/templates', { headers }),
+          fetch('http://localhost:5000/api/v1/settings', { headers })
+        ]);
+        
+        const tplJson = await tplRes.json();
+        const setJson = await setRes.json();
+        
+        if (tplJson.success) setApiTemplates(tplJson.data);
+        if (setJson.success && setJson.data) {
+          setAiInstructions(setJson.data.aiPersonaInstructions || '');
+          setAiMaxReplies(setJson.data.aiConsecutiveReplyCap || 4);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTemplatesAndSettings();
+  }, []);
+
   // Filtered Templates
-  const filteredTemplates = templates.filter(t => {
+  const filteredTemplates = apiTemplates.filter(t => {
     if (templateCategory === 'ALL') return true;
     return t.category === templateCategory;
   });
@@ -90,17 +121,26 @@ export const TemplatesAutomationsPage: React.FC = () => {
     setEditingTemplate(null);
   };
 
-  const handleSaveAIConfig = (e: React.FormEvent) => {
+  const handleSaveAIConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateAIConfig({
-      personaName: aiPersonaName,
-      tone: aiTone,
-      systemInstructions: aiInstructions,
-      creativityTemperature: aiCreativity,
-      maxConsecutiveReplies: aiMaxReplies
-    });
-    setAiSavedToast(true);
-    setTimeout(() => setAiSavedToast(false), 3000);
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch('http://localhost:5000/api/v1/settings', {
+        method: 'PUT',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          aiPersonaInstructions: aiInstructions,
+          aiConsecutiveReplyCap: aiMaxReplies
+        })
+      });
+      setAiSavedToast(true);
+      setTimeout(() => setAiSavedToast(false), 3000);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const isReadOnly = currentUser.role === 'READ_ONLY';
@@ -132,7 +172,7 @@ export const TemplatesAutomationsPage: React.FC = () => {
             activeTab === 'templates' ? 'border-[#155EEF] text-[#155EEF]' : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
           }`}
         >
-          <FileText className="w-4 h-4" /> Email & SMS Templates ({templates.length})
+          <FileText className="w-4 h-4" /> Email & SMS Templates ({apiTemplates.length})
         </button>
 
         <button

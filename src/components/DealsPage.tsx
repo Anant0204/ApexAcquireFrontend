@@ -139,16 +139,41 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     realtorEmail: ''
   });
 
-  const activeDeals = deals.filter(d => !d.isArchived);
+  const [apiDeals, setApiDeals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchDeals = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/deals/pipeline', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiDeals(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDeals();
+  }, []);
+
+  const activeDeals = apiDeals.filter(d => !d.isArchived);
 
   const filteredDeals = activeDeals.filter((d) => {
     const matchesPipeline = pipelineTab === 'AI_INBOUND' ? d.isAiInbound : true;
     const matchesSearch = d.address.toLowerCase().includes(search.toLowerCase()) ||
-      d.realtorName.toLowerCase().includes(search.toLowerCase()) ||
+      (d.realtorName && d.realtorName.toLowerCase().includes(search.toLowerCase())) ||
       d.city.toLowerCase().includes(search.toLowerCase());
 
     return matchesPipeline && matchesSearch;
   });
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Deals Pipeline...</div>;
+  }
 
   const handleDragStart = (e: React.DragEvent, dealId: string) => {
     e.dataTransfer.setData('dealId', dealId);

@@ -54,13 +54,34 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
   const [overrideScoreVal, setOverrideScoreVal] = useState<number>(92);
   const [overrideReason, setOverrideReason] = useState('');
 
-  const activeConv = conversations.find(c => c.id === activeConversationId) || conversations[0];
+  const [apiConversations, setApiConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/conversations', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiConversations(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchConversations();
+  }, []);
+
+  const activeConv = apiConversations.find(c => c.id === activeConversationId) || apiConversations[0];
   const matchingContact = contacts.find(c => c.id === activeConv?.contactId);
 
-  const filteredConversations = conversations.filter(c => {
-    const matchesSearch = c.realtorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.brokerage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.latestMessage.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredConversations = apiConversations.filter(c => {
+    const matchesSearch = c.contactName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.realtorBrokerage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory = filterCategory === 'ALL' ? true :
       filterCategory === 'Needs Human' ? c.status === 'Needs Human' || c.outreachStage === 'Needs Human Touch' :
@@ -71,6 +92,10 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
 
     return matchesSearch && matchesCategory && matchesTemp;
   });
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Conversations...</div>;
+  }
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();

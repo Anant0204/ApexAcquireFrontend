@@ -2,8 +2,34 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 
 export const ReportsPage: React.FC = () => {
-  const { auditLogs } = useApp();
   const [dateRange, setDateRange] = useState('7d');
+  const [apiData, setApiData] = useState<{ metrics: any, auditLogs: any[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/reports', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiData(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReports();
+  }, []);
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Reports...</div>;
+  }
+
+  const metrics = apiData?.metrics || {};
+  const auditLogs = apiData?.auditLogs || [];
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -44,26 +70,26 @@ export const ReportsPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="executive-panel rounded-2xl p-4 shadow-sm">
           <div className="text-[10px] uppercase font-bold text-[#64748B]">Total SMS Sent</div>
-          <div className="text-2xl font-bold text-[#0F172A] font-mono mt-1">12,490</div>
-          <div className="text-[11px] text-emerald-600 font-semibold mt-1">↑ 14% vs last period</div>
+          <div className="text-2xl font-bold text-[#0F172A] font-mono mt-1">{metrics.totalSmsSent}</div>
+          <div className="text-[11px] text-emerald-600 font-semibold mt-1">{metrics.totalSmsTrend}</div>
         </div>
 
         <div className="executive-panel rounded-2xl p-4 shadow-sm">
           <div className="text-[10px] uppercase font-bold text-[#64748B]">Email Touchpoints</div>
-          <div className="text-2xl font-bold text-[#0F172A] font-mono mt-1">8,120</div>
-          <div className="text-[11px] text-emerald-600 font-semibold mt-1">↑ 8% vs last period</div>
+          <div className="text-2xl font-bold text-[#0F172A] font-mono mt-1">{metrics.emailTouchpoints}</div>
+          <div className="text-[11px] text-emerald-600 font-semibold mt-1">{metrics.emailTrend}</div>
         </div>
 
         <div className="executive-panel rounded-2xl p-4 shadow-sm">
           <div className="text-[10px] uppercase font-bold text-[#64748B]">Avg Realtor Response Time</div>
-          <div className="text-2xl font-bold text-[#155EEF] font-mono mt-1">14 Mins</div>
-          <div className="text-[11px] text-[#64748B] mt-1">AI bot responds in &lt; 2s</div>
+          <div className="text-2xl font-bold text-[#155EEF] font-mono mt-1">{metrics.avgResponseTime}</div>
+          <div className="text-[11px] text-[#64748B] mt-1">{metrics.avgResponseSubtext}</div>
         </div>
 
         <div className="executive-panel rounded-2xl p-4 shadow-sm">
           <div className="text-[10px] uppercase font-bold text-[#64748B]">Deals Underwriting Conversion</div>
-          <div className="text-2xl font-bold text-emerald-600 font-mono mt-1">4.2%</div>
-          <div className="text-[11px] text-[#64748B] mt-1">High conversion in DFW North</div>
+          <div className="text-2xl font-bold text-emerald-600 font-mono mt-1">{metrics.dealConversion}</div>
+          <div className="text-[11px] text-[#64748B] mt-1">{metrics.dealConversionSubtext}</div>
         </div>
       </div>
 
@@ -84,14 +110,22 @@ export const ReportsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E2E8F0] text-[#0F172A]">
-              {auditLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50 transition-colors font-mono text-[11px]">
-                  <td className="py-3 px-3 text-[#155EEF] font-bold">{log.actor}</td>
-                  <td className="py-3 px-3 text-[#0F172A] font-sans font-medium">{log.action}</td>
-                  <td className="py-3 px-3 text-[#475569]">{log.affectedRecord}</td>
-                  <td className="py-3 px-3 text-right text-[#64748B]">{log.timestamp}</td>
+              {auditLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-[#64748B] font-medium text-sm">
+                    0 Records Found. No audit logs available for this period.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                auditLogs.map((log: any) => (
+                  <tr key={log.id} className="hover:bg-slate-50 transition-colors font-mono text-[11px]">
+                    <td className="py-3 px-3 text-[#155EEF] font-bold">{log.actor}</td>
+                    <td className="py-3 px-3 text-[#0F172A] font-sans font-medium">{log.action}</td>
+                    <td className="py-3 px-3 text-[#475569]">{log.affectedRecord}</td>
+                    <td className="py-3 px-3 text-right text-[#64748B]">{log.timestamp}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

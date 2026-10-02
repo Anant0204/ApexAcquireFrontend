@@ -88,7 +88,28 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     propertyDealIds: []
   });
 
-  const activeContacts = contacts.filter(c => !c.isArchived);
+  const [apiContacts, setApiContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/contacts', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiContacts(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  const activeContacts = apiContacts.filter(c => !c.isArchived);
 
   const filteredContacts = activeContacts.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -101,6 +122,10 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
 
     return matchesSearch && matchesStage && matchesTemp;
   });
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Contacts Directory...</div>;
+  }
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {

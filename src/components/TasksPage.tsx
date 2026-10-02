@@ -37,17 +37,42 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
   const [newTaskAssignedTo, setNewTaskAssignedTo] = useState(currentUser.id);
   const [newTaskDueDate, setNewTaskDueDate] = useState('Today');
 
-  const filteredTasks = tasks.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
-      t.description.toLowerCase().includes(search.toLowerCase()) ||
+  const [apiTasks, setApiTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/tasks', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) setApiTasks(json.data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  const filteredTasks = apiTasks.filter(t => {
+    const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase()) ||
+      t.description?.toLowerCase().includes(search.toLowerCase()) ||
       (t.relatedContactName && t.relatedContactName.toLowerCase().includes(search.toLowerCase())) ||
       (t.relatedDealAddress && t.relatedDealAddress.toLowerCase().includes(search.toLowerCase()));
 
     const matchesType = filterType === 'ALL' || t.type === filterType;
-    const matchesStatus = filterStatus === 'ALL' || t.status === filterStatus;
+    const matchesStatus = filterStatus === 'ALL' || (filterStatus === 'PENDING' ? t.status === 'Open' || t.status === 'In Progress' : t.status === 'Completed');
 
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  if (loading) {
+    return <div className="p-6 text-center text-[#475569]">Loading Tasks...</div>;
+  }
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +111,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
           <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1F3A] flex items-center gap-2.5">
             Task Management Desk
             <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#155EEF] text-white shadow-xs">
-              {tasks.filter(t => t.status === 'PENDING').length} Pending
+              {apiTasks.filter(t => t.status === 'Open' || t.status === 'In Progress').length} Pending
             </span>
           </h1>
           <p className="text-xs text-[#475569] mt-1">
@@ -166,7 +191,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
               filterStatus === 'PENDING' ? 'bg-white text-[#155EEF] shadow-xs' : 'text-[#64748B]'
             }`}
           >
-            Pending ({tasks.filter(t => t.status === 'PENDING').length})
+            Pending ({apiTasks.filter(t => t.status === 'Open' || t.status === 'In Progress').length})
           </button>
           <button
             onClick={() => setFilterStatus('COMPLETED')}
@@ -174,7 +199,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
               filterStatus === 'COMPLETED' ? 'bg-white text-emerald-600 shadow-xs' : 'text-[#64748B]'
             }`}
           >
-            Completed ({tasks.filter(t => t.status === 'COMPLETED').length})
+            Completed ({apiTasks.filter(t => t.status === 'Completed').length})
           </button>
         </div>
 
@@ -188,7 +213,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
           </div>
         ) : (
           filteredTasks.map((task) => {
-            const isPending = task.status === 'PENDING';
+            const isPending = task.status === 'Open' || task.status === 'In Progress';
 
             return (
               <div

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/crm';
 import { Save, Bot, Sliders, Shield, Users, Check, UserPlus, X } from 'lucide-react';
+import { IntegrationSettingsTab } from './IntegrationSettingsTab';
 
 export const SettingsPage: React.FC = () => {
   const { settings, updateSettings, users, addUser, toggleUserStatus, currentUser } = useApp();
@@ -24,10 +25,43 @@ export const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('ai');
 
   // Form local state
-  const [instructions, setInstructions] = useState(settings.aiInstructions);
-  const [maxReplies, setMaxReplies] = useState(settings.aiMaxConsecutiveReplies);
-  const [cadenceDays, setCadenceDays] = useState(settings.cadenceIntervalDays);
+  const [instructions, setInstructions] = useState('');
+  const [maxReplies, setMaxReplies] = useState(4);
+  const [cadenceDays, setCadenceDays] = useState(30);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [apiSettings, setApiSettings] = useState<any>(null);
+  const [apiUsers, setApiUsers] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [setRes, usrRes] = await Promise.all([
+          fetch('http://localhost:5000/api/v1/settings', { headers }),
+          fetch('http://localhost:5000/api/v1/users', { headers })
+        ]);
+
+        const setJson = await setRes.json();
+        const usrJson = await usrRes.json();
+
+        if (setJson.success && setJson.data) {
+          setApiSettings(setJson.data);
+          setInstructions(setJson.data.aiPersonaInstructions || '');
+          setMaxReplies(setJson.data.aiConsecutiveReplyCap || 4);
+          setCadenceDays(setJson.data.cadenceRetouchIntervalDays || 30);
+        }
+
+        if (usrJson.success) {
+          setApiUsers(usrJson.data);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchData();
+  }, []);
 
   // User Management Modal State (Admin Only)
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -38,16 +72,27 @@ export const SettingsPage: React.FC = () => {
 
   const safeActiveTab = visibleTabs.some(t => t.id === activeTab) ? activeTab : 'ai';
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
-      aiInstructions: instructions,
-      aiMaxConsecutiveReplies: maxReplies,
-      cadenceIntervalDays: cadenceDays
-    });
-
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch('http://localhost:5000/api/v1/settings', {
+        method: 'PUT',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          aiPersonaInstructions: instructions,
+          aiConsecutiveReplyCap: maxReplies,
+          cadenceRetouchIntervalDays: cadenceDays
+        })
+      });
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleCreateUser = (e: React.FormEvent) => {
@@ -95,30 +140,14 @@ export const SettingsPage: React.FC = () => {
 
       {/* TAB: INTEGRATIONS VIEW (ADMIN ONLY - MANAGER CANNOT SEE THIS TAB AT ALL) */}
       {safeActiveTab === 'integrations' && isAdmin && (
-        <div className="executive-panel rounded-2xl p-6 space-y-4 text-xs shadow-sm border border-[#E2E8F0]">
-          <h3 className="font-bold text-[#0B1F3A] uppercase tracking-wider">Gateway Credentials</h3>
-          <div className="space-y-3">
-            <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] flex justify-between items-center text-[#0F172A]">
-              <span className="font-semibold">SMS Gateway (Twilio):</span>
-              <span className="font-mono text-emerald-600 font-bold">Connected (AC7482910••••3819)</span>
-            </div>
-            <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] flex justify-between items-center text-[#0F172A]">
-              <span className="font-semibold">Email Gateway (Microsoft 365):</span>
-              <span className="font-mono text-emerald-600 font-bold">Connected (ms_live_••••9901)</span>
-            </div>
-            <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] flex justify-between items-center text-[#0F172A]">
-              <span className="font-semibold">AI Engine (OpenAI GPT-4o):</span>
-              <span className="font-mono text-emerald-600 font-bold">Connected (sk-proj-••••4812)</span>
-            </div>
-          </div>
-        </div>
+        <IntegrationSettingsTab />
       )}
 
       {/* TAB: USER MANAGEMENT (ADMIN ONLY - MANAGER CANNOT SEE THIS TAB AT ALL) */}
       {safeActiveTab === 'users' && isAdmin && (
         <div className="executive-panel rounded-2xl p-6 space-y-4 shadow-sm border border-[#E2E8F0]">
           <div className="flex justify-between items-center pb-2 border-b border-[#E2E8F0]">
-            <h3 className="text-xs font-bold text-[#0B1F3A] uppercase tracking-wider">Active System Users ({users.length})</h3>
+            <h3 className="text-xs font-bold text-[#0B1F3A] uppercase tracking-wider">Active System Users ({apiUsers.length})</h3>
             <button
               onClick={() => setShowAddUserModal(true)}
               className="px-3.5 py-1.5 btn-executive-primary text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
@@ -128,26 +157,26 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {users.map((u) => (
+            {apiUsers.map((u) => (
               <div key={u.id} className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between text-xs shadow-sm">
                 <div>
                   <div className="font-bold text-[#0F172A] flex items-center gap-2">
-                    {u.name}
+                    {u.firstName} {u.lastName}
                     <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#EAF2FF] text-[#155EEF] border border-[#155EEF]/20">
                       {u.role}
                     </span>
                   </div>
-                  <div className="text-[10px] text-[#475569]">{u.email} &bull; {u.title}</div>
+                  <div className="text-[10px] text-[#475569]">{u.email} &bull; {u.jobTitle || 'Acquisition Agent'}</div>
                 </div>
 
                 {u.id !== currentUser.id && (
                   <button
                     onClick={() => toggleUserStatus(u.id)}
                     className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
-                      u.status === 'Active' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                     }`}
                   >
-                    {u.status === 'Active' ? 'Deactivate User' : 'Reactivate User'}
+                    {u.status === 'ACTIVE' ? 'Deactivate User' : 'Reactivate User'}
                   </button>
                 )}
               </div>
@@ -204,11 +233,11 @@ export const SettingsPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                   <span className="text-[#64748B] block text-[10px] uppercase font-bold">Address Captured</span>
-                  <strong className="text-[#155EEF] text-sm font-mono">{settings.gradeWeights.address}% Weight</strong>
+                  <strong className="text-[#155EEF] text-sm font-mono">{apiSettings?.gradingWeightAddress || 35}% Weight</strong>
                 </div>
                 <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                   <span className="text-[#64748B] block text-[10px] uppercase font-bold">Price Response</span>
-                  <strong className="text-[#155EEF] text-sm font-mono">{settings.gradeWeights.price}% Weight</strong>
+                  <strong className="text-[#155EEF] text-sm font-mono">{apiSettings?.gradingWeightPrice || 20}% Weight</strong>
                 </div>
               </div>
             </div>

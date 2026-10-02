@@ -1,122 +1,157 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useApp } from './context/AppContext';
+import { LoginPage } from './components/LoginPage';
+import { AppShell } from './components/AppShell';
+import { DashboardPage } from './components/DashboardPage';
+import { OutreachPipelinePage } from './components/OutreachPipelinePage';
+import { DealsPage } from './components/DealsPage';
+import { TasksPage } from './components/TasksPage';
+import { ContactsPage } from './components/ContactsPage';
+import { ContactDetailPage } from './components/ContactDetailPage';
+import { ConversationsPage } from './components/ConversationsPage';
+import { TemplatesAutomationsPage } from './components/TemplatesAutomationsPage';
+import { ReportsPage } from './components/ReportsPage';
+import { SettingsPage } from './components/SettingsPage';
+import { DealDetailDrawer } from './components/DealDetailDrawer';
+import { ClickToCallModal } from './components/ClickToCallModal';
+import { SystemTutorialModal } from './components/SystemTutorialModal';
+import type { RealtorContact, PropertyDeal } from './types/crm';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+const App: React.FC = () => {
+  const { isAuthenticated, setActiveConversationId, currentUser, deals } = useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Selected objects
+  const [selectedContact, setSelectedContact] = useState<RealtorContact | null>(null);
+  const [selectedDeal, setSelectedDeal] = useState<PropertyDeal | null>(null);
+  const [callingContact, setCallingContact] = useState<RealtorContact | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Redirect to dashboard upon login
+  useEffect(() => {
+    if (isAuthenticated && location.pathname === '/login') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, location.pathname, navigate]);
+
+  // Navigation Access Matrix across roles
+  const allowedTabs: Record<string, string[]> = {
+    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
+    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
+    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates'],
+    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'reports']
+  };
+
+  const userRole = currentUser?.role || 'READ_ONLY';
+  const rolePath = userRole.toLowerCase().replace('_', '-');
+  const userAllowedTabs = allowedTabs[userRole] || ['dashboard'];
+
+  // Map path to active tab (e.g., /admin/dashboard -> dashboard)
+  const pathParts = location.pathname.split('/');
+  const routeRole = pathParts[1];
+  const activeTabFromPath = pathParts[2] || 'dashboard';
+  const safeActiveTab = userAllowedTabs.includes(activeTabFromPath) ? activeTabFromPath : 'dashboard';
+
+  // Fallback redirect if unauthorized route is accessed, or wrong role path
+  useEffect(() => {
+    if (isAuthenticated && location.pathname !== '/login' && location.pathname !== '/') {
+      const isWrongRole = routeRole !== rolePath;
+      const isWrongTab = !userAllowedTabs.includes(activeTabFromPath) && !selectedContact;
+      
+      if (isWrongRole || isWrongTab) {
+        navigate(`/${rolePath}/dashboard`, { replace: true });
+      }
+    }
+  }, [isAuthenticated, location.pathname, activeTabFromPath, userAllowedTabs, navigate, selectedContact, rolePath, routeRole]);
+
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  const handleNavigateWithTarget = (tab: string, convId?: string) => {
+    setSelectedContact(null);
+    if (userAllowedTabs.includes(tab)) {
+      navigate(`/${rolePath}/${tab}`);
+    } else {
+      navigate(`/${rolePath}/dashboard`);
+    }
+    if (convId) {
+      setActiveConversationId(convId);
+    }
+  };
+
+  const activeDealObj = deals.find(d => d.id === selectedDeal?.id) || selectedDeal;
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <AppShell 
+      activeTab={safeActiveTab} 
+      setActiveTab={handleNavigateWithTarget}
+      onOpenTutorial={() => setShowTutorial(true)}
+    >
+      {/* If a contact is selected, show the Dedicated Full Screen Contact Detail Page */}
+      {selectedContact ? (
+        <ContactDetailPage
+          contact={selectedContact}
+          onBack={() => {
+            setSelectedContact(null);
+            navigate(-1);
+          }}
+          onOpenCallModal={(c) => setCallingContact(c)}
+          onNavigateToConversation={(convId) => {
+            setSelectedContact(null);
+            handleNavigateWithTarget('conversations', convId);
+          }}
+          onSelectDeal={(d) => {
+            setSelectedContact(null);
+            setSelectedDeal(d);
+            handleNavigateWithTarget('deals');
+          }}
+        />
+      ) : (
+        <Routes>
+          <Route path="/" element={<Navigate to={`/${rolePath}/dashboard`} replace />} />
+          <Route path={`/${rolePath}/dashboard`} element={<DashboardPage onNavigate={handleNavigateWithTarget} />} />
+          <Route path={`/${rolePath}/outreach`} element={<OutreachPipelinePage onSelectContact={setSelectedContact} onOpenCallModal={setCallingContact} />} />
+          <Route path={`/${rolePath}/deals`} element={<DealsPage onSelectDeal={setSelectedDeal} />} />
+          <Route path={`/${rolePath}/conversations`} element={<ConversationsPage onOpenCallModal={setCallingContact} />} />
+          <Route path={`/${rolePath}/tasks`} element={<TasksPage onNavigate={handleNavigateWithTarget} />} />
+          <Route path={`/${rolePath}/contacts`} element={<ContactsPage onSelectContact={setSelectedContact} onOpenCallModal={setCallingContact} />} />
+          <Route path={`/${rolePath}/templates`} element={<TemplatesAutomationsPage />} />
+          <Route path={`/${rolePath}/reports`} element={<ReportsPage />} />
+          <Route path={`/${rolePath}/settings`} element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to={`/${rolePath}/dashboard`} replace />} />
+        </Routes>
+      )}
 
-      <div className="ticks"></div>
+      {/* MODALS */}
+      <DealDetailDrawer
+        deal={activeDealObj}
+        onClose={() => setSelectedDeal(null)}
+        onOpenConversation={(convId) => {
+          setSelectedDeal(null);
+          handleNavigateWithTarget('conversations', convId);
+        }}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <ClickToCallModal
+        contact={callingContact}
+        onClose={() => setCallingContact(null)}
+      />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
+      <SystemTutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+      />
+    </AppShell>
+  );
+};
 
-export default App
+export default App;
