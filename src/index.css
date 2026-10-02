@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 @layer base {
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
   body {
     background-color: #F8FBFF;
     background-image: 
@@ -11,7 +19,6 @@
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
     transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
   }
 

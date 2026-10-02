@@ -61,20 +61,37 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
   const [showCsvWizard, setShowCsvWizard] = useState(false);
   const [csvStep, setCsvStep] = useState<1 | 2 | 3>(1);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    licenseNumber: string;
+    brokerage: string;
+    email: string;
+    phone: string;
+    market: string;
+    status: OutreachStage;
+    outreachStage: OutreachStage;
+    temperature: ContactTemperature;
+    ownerId: string;
+    ownerName: string;
+    tags: string[];
+    grade: Grade;
+    score: number;
+    sequenceInfo: RealtorContact['sequenceInfo'];
+    propertyDealIds: string[];
+  }>({
     name: '',
     licenseNumber: '',
     brokerage: '',
     email: '',
     phone: '',
     market: 'Dallas Metro',
-    status: 'Queued for Outreach' as OutreachStage,
-    outreachStage: 'Queued for Outreach' as OutreachStage,
-    temperature: 'Warm' as ContactTemperature,
+    status: 'Queued for Outreach',
+    outreachStage: 'Queued for Outreach',
+    temperature: 'Warm',
     ownerId: currentUser.id,
     ownerName: currentUser.name,
     tags: ['Realtor Directory'],
-    grade: 'B' as Grade,
+    grade: 'B',
     score: 75,
     sequenceInfo: {
       currentTouch: 0,
@@ -83,10 +100,11 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
       recycleCount: 0,
       lastTouchDate: 'Never',
       nextScheduledTouch: 'Touch 1 Ready',
-      channel: 'sms' as const
+      channel: 'sms'
     },
     propertyDealIds: []
   });
+
 
   const activeContacts = contacts.filter(c => !c.isArchived);
 

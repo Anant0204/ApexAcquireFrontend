@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import type { PropertyDeal } from '../types/crm';
+import type { PropertyDeal, RealtorContact } from '../types/crm';
 import {
   X,
   FileCheck,
@@ -13,7 +13,8 @@ import {
   PlusCircle,
   DollarSign,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -21,10 +22,11 @@ interface DealDetailProps {
   deal: PropertyDeal | null;
   onClose: () => void;
   onOpenConversation: (convId: string) => void;
+  onSelectContact?: (contact: RealtorContact) => void;
 }
 
-export const DealDetailDrawer: React.FC<DealDetailProps> = ({ deal, onClose, onOpenConversation }) => {
-  const { addGeneratedContract, updateDeal, currentUser } = useApp();
+export const DealDetailDrawer: React.FC<DealDetailProps> = ({ deal, onClose, onOpenConversation, onSelectContact }) => {
+  const { addGeneratedContract, updateDeal, currentUser, contacts } = useApp();
   
   // Contract Generator Wizard Modal State
   const [showContractWizard, setShowContractWizard] = useState(false);
@@ -71,11 +73,12 @@ export const DealDetailDrawer: React.FC<DealDetailProps> = ({ deal, onClose, onO
 
   const isReadOnly = currentUser.role === 'READ_ONLY';
 
-  // Real-time MAO Calculation
+  // Real-time MAO Calculation (Podio standard: (ARV * 0.8) - Rehab)
   const arvNum = parseFloat(arvInput) || 0;
   const rehabNum = parseFloat(rehabInput) || 0;
   const feeNum = parseFloat(wholesaleFeeInput) || 0;
-  const calculatedMao = Math.max(0, arvNum - rehabNum - feeNum);
+  const mao80 = Math.max(0, Math.round((arvNum * 0.80) - rehabNum));
+  const calculatedMao = mao80;
 
   const handleSaveUnderwriting = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +89,11 @@ export const DealDetailDrawer: React.FC<DealDetailProps> = ({ deal, onClose, onO
         arv: arvNum,
         estimatedRehab: rehabNum,
         targetWholesaleFee: feeNum,
-        calculatedMao
+        calculatedMao: mao80,
+        mao80,
+        mao77: Math.max(0, Math.round((arvNum * 0.77) - rehabNum)),
+        mao75: Math.max(0, Math.round((arvNum * 0.75) - rehabNum)),
+        mao70: Math.max(0, Math.round((arvNum * 0.70) - rehabNum))
       }
     });
 
@@ -202,26 +209,53 @@ export const DealDetailDrawer: React.FC<DealDetailProps> = ({ deal, onClose, onO
           </div>
 
           {/* REALTOR CONTACT CARD */}
-          <div className="executive-panel rounded-2xl p-4 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#EAF2FF] text-[#155EEF] font-bold flex items-center justify-center border border-[#155EEF]/20">
+          <div className="executive-panel rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div 
+              onClick={() => {
+                const matchedContact = contacts.find(c => c.id === deal.contactId || c.name.toLowerCase() === deal.realtorName.toLowerCase());
+                if (matchedContact && onSelectContact) {
+                  onSelectContact(matchedContact);
+                }
+              }}
+              className="flex items-center gap-3 cursor-pointer group"
+              title="Click to view full contact profile"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#EAF2FF] group-hover:bg-[#DBEAFE] text-[#155EEF] font-bold flex items-center justify-center border border-[#155EEF]/20 transition-colors">
                 {deal.realtorName.substring(0, 2)}
               </div>
               <div>
-                <div className="font-bold text-sm text-[#0F172A]">{deal.realtorName}</div>
+                <div className="font-bold text-sm text-[#0F172A] group-hover:text-[#155EEF] transition-colors flex items-center gap-1.5">
+                  <span>{deal.realtorName}</span>
+                  <span className="text-[10px] text-[#155EEF] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">(View Profile)</span>
+                </div>
                 <div className="text-xs text-[#475569]">{deal.realtorBrokerage} &bull; {deal.realtorPhone}</div>
               </div>
             </div>
 
-            {deal.conversationId && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => { onClose(); onOpenConversation(deal.conversationId!); }}
-                className="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] text-xs font-bold text-[#155EEF] hover:bg-[#EAF2FF] transition-all shadow-sm"
+                onClick={() => {
+                  const matchedContact = contacts.find(c => c.id === deal.contactId || c.name.toLowerCase() === deal.realtorName.toLowerCase());
+                  if (matchedContact && onSelectContact) {
+                    onSelectContact(matchedContact);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-[#F1F6FC] hover:bg-[#EAF2FF] border border-[#E2E8F0] text-xs font-bold text-[#0B1F3A] hover:text-[#155EEF] transition-all shadow-xs cursor-pointer"
               >
-                View SMS History &rarr;
+                Contact Details &rarr;
               </button>
-            )}
+
+              {deal.conversationId && (
+                <button
+                  onClick={() => { onClose(); onOpenConversation(deal.conversationId!); }}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] text-xs font-bold text-[#155EEF] hover:bg-[#EAF2FF] transition-all shadow-xs cursor-pointer"
+                >
+                  SMS Chat &rarr;
+                </button>
+              )}
+            </div>
           </div>
+
 
           {/* SECTION 1: INTERACTIVE UNDERWRITING / MAO CALCULATOR */}
           <div className="executive-panel rounded-2xl p-5 space-y-4 shadow-sm">
@@ -290,19 +324,19 @@ export const DealDetailDrawer: React.FC<DealDetailProps> = ({ deal, onClose, onO
                 </div>
               </div>
 
-              {/* MAO CALCULATED BANNER */}
+              {/* MAO CALCULATED BANNER (Podio Standard) */}
               <div className="p-4 rounded-xl bg-gradient-to-r from-[#0B1F3A] to-[#155EEF] border border-[#BFDBFE] text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden">
                 <div className="absolute right-0 top-0 w-36 h-36 bg-white/5 rounded-full blur-xl pointer-events-none" />
                 <div>
                   <span className="text-[10px] font-extrabold text-[#93C5FD] uppercase tracking-wider block">
-                    Calculated Maximum Allowable Offer (MAO)
+                    Calculated Maximum Allowable Offer (MAO 80%)
                   </span>
                   <span className="text-xs text-slate-200 font-medium">
-                    Formula: ARV (${arvNum.toLocaleString()}) - Rehab (${rehabNum.toLocaleString()}) - Fee (${feeNum.toLocaleString()})
+                    Formula: (ARV ${arvNum.toLocaleString()} &times; 0.80) - Rehab (${rehabNum.toLocaleString()})
                   </span>
                 </div>
                 <div className="text-2xl font-extrabold font-mono text-emerald-400 drop-shadow-sm shrink-0">
-                  ${calculatedMao.toLocaleString()}
+                  ${mao80.toLocaleString()}
                 </div>
               </div>
 

@@ -12,6 +12,8 @@ import { ConversationsPage } from './components/ConversationsPage';
 import { TemplatesAutomationsPage } from './components/TemplatesAutomationsPage';
 import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
+import { MarketingPage } from './components/MarketingPage';
+import { DealDetailPage } from './components/DealDetailPage';
 import { DealDetailDrawer } from './components/DealDetailDrawer';
 import { ClickToCallModal } from './components/ClickToCallModal';
 import { SystemTutorialModal } from './components/SystemTutorialModal';
@@ -41,10 +43,10 @@ export const MainAppContent: React.FC = () => {
 
   // Navigation Access Matrix across roles
   const allowedTabs: Record<string, string[]> = {
-    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
-    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
-    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates'],
-    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'reports']
+    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'],
+    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'],
+    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates'],
+    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'marketing', 'reports']
   };
 
   const userRole = currentUser.role;
@@ -55,6 +57,7 @@ export const MainAppContent: React.FC = () => {
 
   const handleNavigateWithTarget = (tab: string, convId?: string) => {
     setSelectedContact(null); // Return from contact detail page when changing tabs
+    setSelectedDeal(null); // Return from deal detail page when changing tabs
     if (userAllowedTabs.includes(tab)) {
       setActiveTab(tab);
     } else {
@@ -86,8 +89,22 @@ export const MainAppContent: React.FC = () => {
           onSelectDeal={(d) => {
             setSelectedContact(null);
             setSelectedDeal(d);
-            handleNavigateWithTarget('deals');
           }}
+        />
+      ) : activeDealObj ? (
+        /* If a deal is selected, show Dedicated Full Screen Deal Detail Workspace */
+        <DealDetailPage
+          deal={activeDealObj}
+          onBack={() => setSelectedDeal(null)}
+          onOpenConversation={(convId) => {
+            setSelectedDeal(null);
+            handleNavigateWithTarget('conversations', convId);
+          }}
+          onSelectContact={(c) => {
+            setSelectedDeal(null);
+            setSelectedContact(c);
+          }}
+          onOpenCallModal={(c) => setCallingContact(c)}
         />
       ) : (
         <>
@@ -105,11 +122,17 @@ export const MainAppContent: React.FC = () => {
           )}
 
           {safeActiveTab === 'conversations' && (
-            <ConversationsPage onOpenCallModal={(c) => setCallingContact(c)} />
+            <ConversationsPage 
+              onOpenCallModal={(c) => setCallingContact(c)} 
+              onSelectContact={(c) => setSelectedContact(c)}
+            />
           )}
 
           {safeActiveTab === 'tasks' && (
-            <TasksPage onNavigate={handleNavigateWithTarget} />
+            <TasksPage 
+              onNavigate={handleNavigateWithTarget} 
+              onSelectContact={(c) => setSelectedContact(c)}
+            />
           )}
 
           {safeActiveTab === 'contacts' && (
@@ -119,21 +142,12 @@ export const MainAppContent: React.FC = () => {
             />
           )}
 
+          {safeActiveTab === 'marketing' && <MarketingPage />}
           {safeActiveTab === 'templates' && <TemplatesAutomationsPage />}
           {safeActiveTab === 'reports' && <ReportsPage />}
           {safeActiveTab === 'settings' && <SettingsPage />}
         </>
       )}
-
-      {/* MODALS */}
-      <DealDetailDrawer
-        deal={activeDealObj}
-        onClose={() => setSelectedDeal(null)}
-        onOpenConversation={(convId) => {
-          setSelectedDeal(null);
-          handleNavigateWithTarget('conversations', convId);
-        }}
-      />
 
       <ClickToCallModal
         contact={callingContact}

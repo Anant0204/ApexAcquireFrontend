@@ -20,7 +20,8 @@ import {
   Menu,
   Shield,
   Check,
-  GraduationCap
+  GraduationCap,
+  Share2
 } from 'lucide-react';
 
 interface ShellProps {
@@ -60,11 +61,12 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
   // STRICT ROLE-BASED NAVIGATION WITH ALL FEATURES
   const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
-    { id: 'outreach', label: 'Outreach Pipeline', icon: Send, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '10' },
-    { id: 'deals', label: 'AI Deals Pipeline', icon: Kanban, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '4' },
+    { id: 'outreach', label: 'Outreach Pipeline', icon: Send, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
+    { id: 'deals', label: 'AI Deals & Offers', icon: Building2, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '4' },
     { id: 'conversations', label: 'Conversations', icon: MessageSquare, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '3' },
     { id: 'tasks', label: 'Task Manager', icon: CheckSquare, roles: ['ADMIN', 'MANAGER', 'AGENT'], badge: pendingTasksCount > 0 ? String(pendingTasksCount) : undefined },
     { id: 'contacts', label: 'Contacts Directory', icon: Users, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
+    { id: 'marketing', label: 'Marketing', icon: Share2, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
     { id: 'templates', label: 'Templates & Automations', icon: Sliders, roles: ['ADMIN', 'MANAGER', 'AGENT'] },
     { id: 'reports', label: 'Reports & Audit', icon: BarChart3, roles: ['ADMIN', 'MANAGER', 'READ_ONLY'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['ADMIN', 'MANAGER'] },
@@ -78,10 +80,10 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FBFF] text-[#0F172A] flex flex-col font-sans antialiased">
+    <div className="h-screen w-full overflow-hidden bg-[#F8FBFF] text-[#0F172A] flex flex-col font-sans antialiased">
 
-      {/* TOP HEADER */}
-      <header className="h-16 border-b border-[#E2EAF5] bg-white sticky top-0 z-30 flex items-center justify-between px-4 lg:px-6 shadow-xs">
+      {/* TOP HEADER - FIXED */}
+      <header className="h-16 shrink-0 border-b border-[#E2EAF5] bg-white z-30 flex items-center justify-between px-4 lg:px-6 shadow-xs">
 
         {/* Left Branding & Mobile Menu */}
         <div className="flex items-center gap-3">
@@ -258,25 +260,26 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
 
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex overflow-hidden">
-
-        {/* SIDEBAR NAVIGATION (ULTRA LUXURY OBSIDIAN & SAPPHIRE THEME) */}
+        {/* SIDEBAR NAVIGATION (ULTRA LUXURY OBSIDIAN & SAPPHIRE THEME - FIXED NO SCROLL) */}
         <aside
-          className={`hidden lg:flex flex-col sidebar-luxury-container text-white transition-all duration-300 relative z-20 ${
-            collapsed ? 'w-20' : 'w-64'
+          className={`hidden lg:flex flex-col justify-between sidebar-luxury-container text-white transition-all duration-300 relative z-20 h-full overflow-visible shrink-0 select-none ${
+            collapsed ? 'w-20' : 'w-60'
           }`}
         >
           {/* Subtle Ambient Glow at top of sidebar */}
-          <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#1E40AF]/25 to-transparent pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#1E40AF]/25 to-transparent pointer-events-none rounded-t-none" />
 
           {/* Collapse Toggle Button */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="absolute -right-3 top-6 w-6 h-6 rounded-full bg-[#0B1533] border border-[#1E294B] text-[#94A3B8] hover:text-white flex items-center justify-center z-30 shadow-xl cursor-pointer transition-all hover:scale-110 hover:border-[#60A5FA]"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="absolute -right-3 top-4 w-6 h-6 rounded-full bg-[#070D1E] border border-[#2563EB]/40 text-[#94A3B8] hover:text-white flex items-center justify-center z-40 shadow-xl cursor-pointer transition-all hover:scale-110 hover:border-[#60A5FA] hover:bg-[#155EEF]"
           >
             {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
 
-          <div className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto relative z-10">
+          <div className="py-2.5 px-2.5 space-y-1 relative z-10 flex-1 flex flex-col justify-start overflow-y-auto overflow-x-hidden">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -285,66 +288,96 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold transition-all group cursor-pointer relative ${
+                  title={collapsed ? item.label : undefined}
+                  className={`w-full flex items-center ${
+                    collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-3 py-2'
+                  } rounded-xl text-xs font-semibold transition-all group cursor-pointer relative ${
                     isActive
-                      ? 'sidebar-item-active font-bold'
+                      ? 'sidebar-item-active font-bold shadow-xs'
                       : 'text-[#94A3B8] sidebar-item-hover'
                   }`}
                 >
                   {/* Subtle Active Left Glowing Pillar */}
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-[#93C5FD] rounded-r-full shadow-[0_0_12px_rgba(147,197,253,0.9)]" />
+                    <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${collapsed ? 'w-1 h-4' : 'w-1.5 h-5'} bg-[#93C5FD] rounded-r-full shadow-[0_0_10px_rgba(147,197,253,0.9)]`} />
                   )}
 
-                  <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'text-[#64748B] group-hover:text-white'}`} />
-                  {!collapsed && <span className="flex-1 text-left tracking-wide">{item.label}</span>}
+                  <Icon className={`w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'text-[#64748B] group-hover:text-white'}`} />
+                  {!collapsed && <span className="flex-1 text-left tracking-wide truncate">{item.label}</span>}
                   {!collapsed && item.badge && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      isActive ? 'bg-white/25 text-white backdrop-blur-md border border-white/30 shadow-xs' : 'bg-white/10 text-[#94A3B8] border border-white/10'
+                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                      isActive ? 'bg-white/25 text-white backdrop-blur-md border border-white/30' : 'bg-white/10 text-[#94A3B8] border border-white/10'
                     }`}>
                       {item.badge}
                     </span>
+                  )}
+                  {collapsed && item.badge && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#3B82F6] ring-2 ring-[#070D1E]" />
                   )}
                 </button>
               );
             })}
           </div>
 
-          {/* Luxury Sidebar Bottom Status Card */}
-          {!collapsed && (
-            <div className="p-3 mx-3 mb-4 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm relative z-10">
-              <div className="flex items-center gap-2 text-[11px] font-bold text-white mb-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                <span>AI Outreach Live</span>
+          {/* Luxury Sidebar Bottom Sign Out Button */}
+          <div className={`p-2 ${collapsed ? 'mx-1' : 'mx-2'} mb-2.5 border-t border-white/10 pt-2.5 relative z-10 shrink-0`}>
+            <button
+              onClick={() => logout()}
+              title="Sign Out"
+              className={`w-full flex items-center ${
+                collapsed ? 'justify-center px-0 py-2' : 'justify-between px-3 py-2'
+              } rounded-xl text-xs font-bold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/20 hover:border-rose-400/40 transition-all cursor-pointer group shadow-sm`}
+            >
+              <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-2.5'}`}>
+                <LogOut className="w-4 h-4 text-rose-400 group-hover:scale-110 group-hover:text-rose-200 transition-transform" />
+                {!collapsed && <span>Sign Out</span>}
               </div>
-              <div className="text-[10px] text-[#94A3B8] leading-tight">
-                5-Touch Sequence & 30-Day Nurture Active
-              </div>
-            </div>
-          )}
+              {!collapsed && (
+                <span className="text-[10px] text-rose-300/80 font-normal font-mono uppercase tracking-wider">
+                  {currentUser.role.replace('_', ' ')}
+                </span>
+              )}
+            </button>
+          </div>
         </aside>
 
         {/* MOBILE DRAWER */}
         {mobileDrawerOpen && (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-40 lg:hidden flex">
-            <div className="w-72 sidebar-luxury-container text-white p-4 flex flex-col h-full shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                <div className="font-extrabold text-white">APEX <span className="text-[#60A5FA]">ACQUIRE</span></div>
-                <button onClick={() => setMobileDrawerOpen(false)} className="text-[#94A3B8] hover:text-white">✕</button>
+            <div className="w-72 sidebar-luxury-container text-white p-4 flex flex-col h-full shadow-2xl justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                  <div className="font-extrabold text-white">APEX <span className="text-[#60A5FA]">ACQUIRE</span></div>
+                  <button onClick={() => setMobileDrawerOpen(false)} className="text-[#94A3B8] hover:text-white">✕</button>
+                </div>
+                <div className="py-4 space-y-1.5">
+                  {visibleNavItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavClick(item.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold ${
+                        activeTab === item.id ? 'sidebar-item-active font-bold' : 'text-[#94A3B8] sidebar-item-hover'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex-1 py-4 space-y-2">
-                {visibleNavItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavClick(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold ${
-                      activeTab === item.id ? 'sidebar-item-active font-bold' : 'text-[#94A3B8] sidebar-item-hover'
-                    }`}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
+
+              {/* Mobile Drawer Logout */}
+              <div className="border-t border-white/10 pt-3">
+                <button
+                  onClick={() => {
+                    logout();
+                    setMobileDrawerOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4 text-rose-400" />
+                  <span>Sign Out ({currentUser.name})</span>
+                </button>
               </div>
             </div>
             <div className="flex-1" onClick={() => setMobileDrawerOpen(false)} />
