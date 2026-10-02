@@ -186,11 +186,21 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     e.dataTransfer.dropEffect = 'move';
   };
 
+  const handleDealStageChange = (dealId: string, targetStage: DealStage) => {
+    setApiDeals(prev => prev.map(d => {
+      if (d.id === dealId) {
+        return { ...d, stage: targetStage };
+      }
+      return d;
+    }));
+    updateDealStage(dealId, targetStage);
+  };
+
   const handleDrop = (e: React.DragEvent, targetStage: DealStage) => {
     e.preventDefault();
     const dealId = e.dataTransfer.getData('dealId') || e.dataTransfer.getData('text/plain');
     if (dealId && currentUser.role !== 'READ_ONLY') {
-      updateDealStage(dealId, targetStage);
+      handleDealStageChange(dealId, targetStage);
     }
   };
 
@@ -504,7 +514,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                           <select
                             value={deal.stage}
                             onChange={(e) => {
-                              updateDealStage(deal.id, e.target.value as DealStage);
+                              handleDealStageChange(deal.id, e.target.value as DealStage);
                             }}
                             className="text-[10px] font-bold bg-[#F1F6FC] hover:bg-[#EAF2FF] text-[#0B1F3A] border border-[#CBD5E1] hover:border-[#155EEF] rounded-lg px-2 py-1 focus:outline-none focus:border-[#155EEF] transition-colors cursor-pointer w-full max-w-[170px] truncate"
                           >

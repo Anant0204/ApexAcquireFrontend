@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { CRMTask, TaskType, TaskPriority } from '../types/crm';
 import {
@@ -15,48 +15,151 @@ import {
   Trash2,
   ArrowRight,
   Check,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 
 interface TasksPageProps {
   onNavigate: (tab: string, convId?: string) => void;
+  onSelectContact?: (contact: any) => void;
 }
 
 export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
-  const { tasks, addTask, updateTask, completeTask, deleteTask, users, currentUser } = useApp();
+  const { users, currentUser } = useApp();
   
-  const [filterType, setFilterType] = useState<'ALL' | TaskType>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | string>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('PENDING');
   const [search, setSearch] = useState('');
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDesc, setNewTaskDesc] = useState('');
-  const [newTaskType, setNewTaskType] = useState<TaskType>('human_touch');
-  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>('HIGH');
+  const [newTaskType, setNewTaskType] = useState<string>('human_touch');
+  const [newTaskPriority, setNewTaskPriority] = useState<string>('HIGH');
   const [newTaskAssignedTo, setNewTaskAssignedTo] = useState(currentUser.id);
   const [newTaskDueDate, setNewTaskDueDate] = useState('Today');
 
+  const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [apiTasks, setApiTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  React.useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/tasks', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const json = await res.json();
-        if (json.success) setApiTasks(json.data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('http://localhost:5000/api/v1/tasks', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setApiTasks(json.data);
       }
-    };
+    } catch (e) {
+      console.error('Failed to fetch tasks:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('http://localhost:5000/api/v1/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setDbUsers(json.data);
+        if (!newTaskAssignedTo && json.data.length > 0) {
+          setNewTaskAssignedTo(currentUser.id || json.data[0].id);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch users:', e);
+    }
+  };
+
+  useEffect(() => {
     fetchTasks();
+    fetchUsers();
   }, []);
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('http://localhost:5000/api/v1/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: newTaskTitle,
+          description: newTaskDesc,
+          type: newTaskType,
+          priority: newTaskPriority,
+          assignedToId: newTaskAssignedTo || currentUser.id,
+          dueDate: newTaskDueDate
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setApiTasks(prev => [json.data, ...prev]);
+        setShowAddTaskModal(false);
+        setNewTaskTitle('');
+        setNewTaskDesc('');
+      } else {
+        alert('Failed to save task: ' + (json.error?.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Task creation failed', err);
+      alert('Network error while saving task.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`http://localhost:5000/api/v1/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'COMPLETED' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApiTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'Completed', rawStatus: 'COMPLETED' } : t));
+      }
+    } catch (err) {
+      console.error('Task complete failed', err);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`http://localhost:5000/api/v1/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApiTasks(prev => prev.filter(t => t.id !== taskId));
+      }
+    } catch (err) {
+      console.error('Task delete failed', err);
+    }
+  };
 
   const filteredTasks = apiTasks.filter(t => {
     const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,31 +173,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  if (loading) {
-    return <div className="p-6 text-center text-[#475569]">Loading Tasks...</div>;
-  }
-
-  const handleCreateTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    const assignedUser = users.find(u => u.id === newTaskAssignedTo) || currentUser;
-
-    addTask({
-      title: newTaskTitle,
-      description: newTaskDesc,
-      type: newTaskType,
-      priority: newTaskPriority,
-      status: 'PENDING',
-      assignedToId: assignedUser.id,
-      assignedToName: assignedUser.name,
-      dueDate: newTaskDueDate
-    });
-
-    setShowAddTaskModal(false);
-    setNewTaskTitle('');
-    setNewTaskDesc('');
-  };
-
   const isReadOnly = currentUser.role === 'READ_ONLY';
+  const availableUsersList = dbUsers.length > 0 ? dbUsers : users;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -119,14 +199,24 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
           </p>
         </div>
 
-        {!isReadOnly && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowAddTaskModal(true)}
-            className="px-4 py-2.5 btn-executive-primary text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all self-start md:self-auto"
+            onClick={fetchTasks}
+            className="p-2.5 bg-white border border-[#E2E8F0] hover:border-[#155EEF] text-[#475569] hover:text-[#155EEF] rounded-xl shadow-xs transition-all cursor-pointer"
+            title="Refresh Tasks"
           >
-            <Plus className="w-4 h-4" /> Create Custom Task
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-        )}
+
+          {!isReadOnly && (
+            <button
+              onClick={() => setShowAddTaskModal(true)}
+              className="px-4 py-2.5 btn-executive-primary text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all self-start md:self-auto"
+            >
+              <Plus className="w-4 h-4" /> Create Custom Task
+            </button>
+          )}
+        </div>
       </div>
 
       {/* FILTER CONTROLS */}
@@ -207,7 +297,11 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
 
       {/* TASKS LIST */}
       <div className="space-y-3">
-        {filteredTasks.length === 0 ? (
+        {loading ? (
+          <div className="executive-panel rounded-2xl p-12 text-center text-xs text-[#64748B]">
+            Loading tasks from server...
+          </div>
+        ) : filteredTasks.length === 0 ? (
           <div className="executive-panel rounded-2xl p-12 text-center text-xs text-[#64748B]">
             No tasks found matching current filters.
           </div>
@@ -247,23 +341,25 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
                       {task.type === 'lead_created' && <Building className="w-3 h-3 text-emerald-600" />}
                       {task.type === 'need_help' && <AlertTriangle className="w-3 h-3 text-rose-600" />}
                       {task.type === 'phone_call' && <PhoneCall className="w-3 h-3 text-[#155EEF]" />}
-                      <span className="capitalize">{task.type.replace('_', ' ')}</span>
+                      <span className="capitalize">{(task.type || 'general').replace('_', ' ')}</span>
                     </span>
 
                     <span className="font-bold text-sm text-[#0B1F3A]">{task.title}</span>
                   </div>
 
-                  <p className="text-xs text-[#475569] leading-relaxed">
-                    {task.description}
-                  </p>
+                  {task.description && (
+                    <p className="text-xs text-[#475569] leading-relaxed">
+                      {task.description}
+                    </p>
+                  )}
 
                   {/* Metadata Row */}
                   <div className="flex flex-wrap items-center gap-4 text-[11px] text-[#64748B] pt-1">
                     <span className="flex items-center gap-1 font-medium text-[#0F172A]">
-                      <UserCheck className="w-3.5 h-3.5 text-[#155EEF]" /> Assigned: {task.assignedToName}
+                      <UserCheck className="w-3.5 h-3.5 text-[#155EEF]" /> Assigned: {task.assignedToName || 'Unassigned'}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" /> Due: {task.dueDate}
+                      <Clock className="w-3.5 h-3.5" /> Due: {task.dueDate || 'Today'}
                     </span>
                     {task.relatedContactName && (
                       <span>Realtor: <strong className="text-[#0F172A]">{task.relatedContactName}</strong></span>
@@ -296,7 +392,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
 
                   {!isReadOnly && isPending && (
                     <button
-                      onClick={() => completeTask(task.id)}
+                      onClick={() => handleCompleteTask(task.id)}
                       className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
                     >
                       <Check className="w-3.5 h-3.5" /> Mark Done
@@ -311,8 +407,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
 
                   {!isReadOnly && (
                     <button
-                      onClick={() => deleteTask(task.id)}
-                      className="p-2 text-[#94A3B8] hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="p-2 text-[#94A3B8] hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
                       title="Delete task"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -353,7 +449,6 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
                 <label className="block text-[#475569] font-bold mb-1">Description / Instructions</label>
                 <textarea
                   rows={3}
-                  required
                   value={newTaskDesc}
                   onChange={(e) => setNewTaskDesc(e.target.value)}
                   placeholder="Specify notes, seller terms, or underwriting guidelines..."
@@ -366,7 +461,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
                   <label className="block text-[#475569] font-bold mb-1">Task Type</label>
                   <select
                     value={newTaskType}
-                    onChange={(e) => setNewTaskType(e.target.value as TaskType)}
+                    onChange={(e) => setNewTaskType(e.target.value)}
                     className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                   >
                     <option value="human_touch">Needs Human Touch</option>
@@ -381,7 +476,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
                   <label className="block text-[#475569] font-bold mb-1">Priority</label>
                   <select
                     value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
+                    onChange={(e) => setNewTaskPriority(e.target.value)}
                     className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                   >
                     <option value="URGENT">URGENT</option>
@@ -400,8 +495,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
                     onChange={(e) => setNewTaskAssignedTo(e.target.value)}
                     className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                   >
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                    {availableUsersList.map((u: any) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || `${u.firstName} ${u.lastName}`} ({u.role})
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -412,7 +509,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
                     type="text"
                     value={newTaskDueDate}
                     onChange={(e) => setNewTaskDueDate(e.target.value)}
-                    placeholder="e.g. Today by 5 PM"
+                    placeholder="e.g. Today, Tomorrow, YYYY-MM-DD"
                     className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF]"
                   />
                 </div>
@@ -420,9 +517,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate }) => {
 
               <button
                 type="submit"
-                className="w-full py-3 btn-executive-primary text-white font-bold rounded-xl mt-3 transition-all shadow-md cursor-pointer"
+                disabled={submitting}
+                className="w-full py-3 btn-executive-primary text-white font-bold rounded-xl mt-3 transition-all shadow-md cursor-pointer disabled:opacity-50"
               >
-                Save Operational Task
+                {submitting ? 'Saving Operational Task...' : 'Save Operational Task'}
               </button>
             </form>
           </div>
