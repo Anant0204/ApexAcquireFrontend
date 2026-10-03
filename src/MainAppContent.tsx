@@ -123,8 +123,8 @@ export const MainAppContent: React.FC = () => {
 
           {safeActiveTab === 'conversations' && (
             <ConversationsPage 
-              onOpenCallModal={(c) => setCallingContact(c)} 
-              onSelectContact={(c) => setSelectedContact(c)}
+              onOpenCallModal={(c: any) => setCallingContact(c)} 
+              onSelectContact={(c: any) => setSelectedContact(c)}
             />
           )}
 

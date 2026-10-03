@@ -21,9 +21,10 @@ import {
 
 interface ConversationsPageProps {
   onOpenCallModal?: (contact: any) => void;
+  onSelectContact?: (contact: any) => void;
 }
 
-export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCallModal }) => {
+export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCallModal, onSelectContact }) => {
   const {
     conversations,
     contacts,
@@ -319,7 +320,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
 
           {/* Messages Feed */}
           <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#F8FAFC]">
-            {activeConv?.messages.map((m) => {
+            {activeConv?.messages.map((m: any) => {
               const isRealtor = m.sender === 'realtor';
               const isAi = m.sender === 'ai';
 

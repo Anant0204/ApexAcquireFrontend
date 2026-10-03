@@ -15,6 +15,7 @@ import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
 import { MarketingPage } from './components/MarketingPage';
 import { DealDetailDrawer } from './components/DealDetailDrawer';
+import { DealDetailPage } from './components/DealDetailPage';
 import { ClickToCallModal } from './components/ClickToCallModal';
 import { SystemTutorialModal } from './components/SystemTutorialModal';
 import type { RealtorContact, PropertyDeal } from './types/crm';
@@ -103,7 +104,6 @@ const App: React.FC = () => {
           contact={selectedContact}
           onBack={() => {
             setSelectedContact(null);
-            navigate(-1);
           }}
           onOpenCallModal={(c) => setCallingContact(c)}
           onNavigateToConversation={(convId) => {
@@ -113,8 +113,22 @@ const App: React.FC = () => {
           onSelectDeal={(d) => {
             setSelectedContact(null);
             setSelectedDeal(d);
-            handleNavigateWithTarget('deals');
           }}
+        />
+      ) : activeDealObj ? (
+        /* If a deal is selected, show Dedicated Full Screen Deal Detail Workspace */
+        <DealDetailPage
+          deal={activeDealObj}
+          onBack={() => setSelectedDeal(null)}
+          onOpenConversation={(convId) => {
+            setSelectedDeal(null);
+            handleNavigateWithTarget('conversations', convId);
+          }}
+          onSelectContact={(c) => {
+            setSelectedDeal(null);
+            setSelectedContact(c);
+          }}
+          onOpenCallModal={(c) => setCallingContact(c)}
         />
       ) : (
         <Routes>
@@ -132,16 +146,6 @@ const App: React.FC = () => {
           <Route path="*" element={<Navigate to={`/${rolePath}/dashboard`} replace />} />
         </Routes>
       )}
-
-      {/* MODALS */}
-      <DealDetailDrawer
-        deal={activeDealObj}
-        onClose={() => setSelectedDeal(null)}
-        onOpenConversation={(convId) => {
-          setSelectedDeal(null);
-          handleNavigateWithTarget('conversations', convId);
-        }}
-      />
 
       <ClickToCallModal
         contact={callingContact}

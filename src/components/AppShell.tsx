@@ -55,15 +55,46 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
     };
   }, []);
 
+  const [dbDealsCount, setDbDealsCount] = useState<number | null>(null);
+  const [dbConvsCount, setDbConvsCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchBadges = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+        const [dealsRes, convsRes] = await Promise.all([
+          fetch('http://localhost:5000/api/v1/deals/pipeline', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('http://localhost:5000/api/v1/conversations', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        const dealsJson = await dealsRes.json();
+        if (dealsJson.success && Array.isArray(dealsJson.data)) {
+          setDbDealsCount(dealsJson.data.filter((d: any) => !d.isArchived).length);
+        }
+        const convsJson = await convsRes.json();
+        if (convsJson.success && Array.isArray(convsJson.data)) {
+          setDbConvsCount(convsJson.data.length);
+        }
+      } catch (e) {}
+    };
+    fetchBadges();
+  }, [currentUser, activeTab]);
+
   const unreadNotifications = notifications.filter(n => !n.read);
-  const pendingTasksCount = tasks.filter(t => t.status === 'PENDING').length;
+  const userPendingTasks = currentUser.role === 'ADMIN'
+    ? tasks.filter(t => t.status === 'PENDING')
+    : tasks.filter(t => t.status === 'PENDING' && (t.assignedToId === currentUser.id || t.assignedToName?.toLowerCase() === currentUser.name?.toLowerCase()));
+  const pendingTasksCount = userPendingTasks.length;
+
+  const activeDealsBadge = (dbDealsCount !== null && dbDealsCount > 0) ? String(dbDealsCount) : undefined;
+  const activeConvsBadge = (dbConvsCount !== null && dbConvsCount > 0) ? String(dbConvsCount) : undefined;
 
   // STRICT ROLE-BASED NAVIGATION WITH ALL FEATURES
   const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
     { id: 'outreach', label: 'Outreach Pipeline', icon: Send, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
-    { id: 'deals', label: 'AI Deals & Offers', icon: Building2, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '4' },
-    { id: 'conversations', label: 'Conversations', icon: MessageSquare, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: '3' },
+    { id: 'deals', label: 'AI Deals & Offers', icon: Building2, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: activeDealsBadge },
+    { id: 'conversations', label: 'Conversations', icon: MessageSquare, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'], badge: activeConvsBadge },
     { id: 'tasks', label: 'Task Manager', icon: CheckSquare, roles: ['ADMIN', 'MANAGER', 'AGENT'], badge: pendingTasksCount > 0 ? String(pendingTasksCount) : undefined },
     { id: 'contacts', label: 'Contacts Directory', icon: Users, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },
     { id: 'marketing', label: 'Marketing', icon: Share2, roles: ['ADMIN', 'MANAGER', 'AGENT', 'READ_ONLY'] },

@@ -264,7 +264,7 @@ export const TemplatesAutomationsPage: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {tpl.variables.map(v => (
+                    {tpl.variables.map((v: string) => (
                       <span key={v} className="px-1.5 py-0.5 bg-[#E2E8F0] rounded text-[9px] font-mono text-[#475569]">
                         {`{{${v}}}`}
                       </span>

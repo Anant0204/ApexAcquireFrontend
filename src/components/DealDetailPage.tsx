@@ -30,7 +30,8 @@ import {
   Check,
   ShieldCheck,
   TrendingUp,
-  Briefcase
+  Briefcase,
+  Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -95,6 +96,8 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
   const [wholesaleFeeInput, setWholesaleFeeInput] = useState<string>('');
   const [offerPriceInput, setOfferPriceInput] = useState<string>('');
   const [analysisSuccessMsg, setAnalysisSuccessMsg] = useState<string | null>(null);
+  const [isSavingAnalysis, setIsSavingAnalysis] = useState(false);
+  const [analysisSavedFeedback, setAnalysisSavedFeedback] = useState(false);
 
   // Property Specs State
   const [bedsInput, setBedsInput] = useState<number>(deal.beds || 3);
@@ -189,9 +192,30 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
   };
 
   // Save Underwriting Numbers
-  const handleSaveAnalysis = (e: React.FormEvent) => {
+  const handleSaveAnalysis = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isReadOnly) return;
+    if (isReadOnly || isSavingAnalysis) return;
+    setIsSavingAnalysis(true);
+
+    const updatedUnderwriting = {
+      marketValue: parseFloat(marketValueInput) || arvNum * 0.95,
+      arv: arvNum,
+      estimatedRehab: rehabNum,
+      closingCosts: closingNum,
+      holdingCosts: holdingNum,
+      targetWholesaleFee: feeNum,
+      calculatedMao: mao80,
+      mao80,
+      mao77,
+      mao75,
+      mao70,
+      estimatedRent: parseFloat(estRentInput) || undefined,
+      conditionNotes: conditionNotesInput,
+      majorWorkItems: selectedMajorWork,
+      offerPrice: offerPriceNum,
+      estimatedProfit,
+      roi: parseFloat(roi)
+    };
 
     updateDeal(deal.id, {
       beds: bedsInput,
@@ -200,25 +224,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
       lotSize: lotSizeInput,
       yearBuilt: yearBuiltInput,
       propertyType: propertyTypeInput,
-      underwriting: {
-        marketValue: parseFloat(marketValueInput) || arvNum * 0.95,
-        arv: arvNum,
-        estimatedRehab: rehabNum,
-        closingCosts: closingNum,
-        holdingCosts: holdingNum,
-        targetWholesaleFee: feeNum,
-        calculatedMao: mao80,
-        mao80,
-        mao77,
-        mao75,
-        mao70,
-        estimatedRent: parseFloat(estRentInput) || undefined,
-        conditionNotes: conditionNotesInput,
-        majorWorkItems: selectedMajorWork,
-        offerPrice: offerPriceNum,
-        estimatedProfit,
-        roi: parseFloat(roi)
-      }
+      underwriting: updatedUnderwriting
     });
 
     addDealActivity(deal.id, {
@@ -227,8 +233,44 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
       description: `MAO (80%) calculated at $${mao80.toLocaleString()} | MAO (77%): $${mao77.toLocaleString()} | MAO (75%): $${mao75.toLocaleString()} | MAO (70%): $${mao70.toLocaleString()} (ARV: $${arvNum.toLocaleString()}, Rehab: $${rehabNum.toLocaleString()})`
     });
 
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`http://localhost:5000/api/v1/deals/${deal.id}/analysis`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          beds: bedsInput,
+          baths: bathsInput,
+          sqft: sqftInput,
+          lotSize: lotSizeInput,
+          yearBuilt: yearBuiltInput,
+          propertyType: propertyTypeInput,
+          underwriting: updatedUnderwriting
+        })
+      });
+    } catch (err) {
+      console.error('Error saving underwriting analysis to backend:', err);
+    } finally {
+      setIsSavingAnalysis(false);
+    }
+
+    try {
+      confetti({
+        particleCount: 40,
+        spread: 60,
+        origin: { y: 0.8 }
+      });
+    } catch (e) {}
+
     setAnalysisSuccessMsg('Podio Property & Financial Analysis saved successfully.');
-    setTimeout(() => setAnalysisSuccessMsg(null), 3500);
+    setAnalysisSavedFeedback(true);
+    setTimeout(() => {
+      setAnalysisSuccessMsg(null);
+      setAnalysisSavedFeedback(false);
+    }, 4000);
   };
 
   // Manager ARV Approval Handlers
@@ -500,8 +542,8 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
               onChange={(e) => updateDealStage(deal.id, e.target.value as DealStage)}
               className="w-full px-3 py-2 bg-white border border-[#CBD5E1] rounded-xl font-bold text-[#0B1F3A] focus:outline-none focus:border-[#155EEF] cursor-pointer"
             >
-              {PIPELINE_STAGES.map(s => (
-                <option key={s} value={s}>{STAGE_CONFIG[s].icon} {s}</option>
+              {PIPELINE_STAGES.map((s: DealStage) => (
+                <option key={s} value={s}>{STAGE_CONFIG[s]?.icon || '⚡'} {s}</option>
               ))}
             </select>
           </div>
@@ -1061,12 +1103,38 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
                 </div>
 
                 {!isReadOnly && (
-                  <div className="flex justify-end">
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    {analysisSavedFeedback && (
+                      <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in slide-in-from-right-2 duration-200">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        Analysis numbers saved to database!
+                      </span>
+                    )}
                     <button
                       type="submit"
-                      className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
+                      disabled={isSavingAnalysis}
+                      className={`px-5 py-2.5 font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-60 ${
+                        analysisSavedFeedback 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-[#0284C7] hover:bg-[#0369A1] text-white'
+                      }`}
                     >
-                      <CheckCircle2 className="w-4 h-4" /> Save Podio Analysis Numbers
+                      {isSavingAnalysis ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving Analysis...
+                        </>
+                      ) : analysisSavedFeedback ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          Saved Successfully!
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          Save Podio Analysis Numbers
+                        </>
+                      )}
                     </button>
                   </div>
                 )}

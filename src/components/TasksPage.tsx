@@ -48,6 +48,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   const [newTaskIsRecurring, setNewTaskIsRecurring] = useState(false);
 
   const [dbUsers, setDbUsers] = useState<any[]>([]);
+  const [dbContacts, setDbContacts] = useState<any[]>([]);
   const [apiTasks, setApiTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -84,28 +85,17 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json.success && Array.isArray(json.data)) {
         setApiTasks(json.data);
-      } else if (contextTasks && contextTasks.length > 0) {
-        setApiTasks(contextTasks.map(t => ({
-          id: t.id,
-          title: t.title,
-          description: t.description || '',
-          type: t.type || 'human_touch',
-          status: t.status === 'COMPLETED' ? 'Completed' : 'Open',
-          rawStatus: t.status,
-          priority: t.priority || 'HIGH',
-          dueDate: t.dueDate || 'Sep 26, 2026 08:00 AM',
-          relatedContactId: t.relatedContactId,
-          relatedContactName: t.relatedContactName || 'Robert Vance',
-          assignedToId: t.assignedToId || currentUser.id,
-          assignedToName: t.assignedToName || currentUser.name,
-          createdAt: t.createdAt
-        })));
       }
     } catch (e) {
+      // If network fails and user is not admin, filter mock tasks by user
       if (contextTasks && contextTasks.length > 0) {
-        setApiTasks(contextTasks.map(t => ({
+        const userMockTasks = currentUser.role === 'ADMIN' 
+          ? contextTasks 
+          : contextTasks.filter(t => t.assignedToId === currentUser.id || t.assignedToName?.toLowerCase() === currentUser.name?.toLowerCase());
+
+        setApiTasks(userMockTasks.map(t => ({
           id: t.id,
           title: t.title,
           description: t.description || '',
@@ -113,9 +103,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
           status: t.status === 'COMPLETED' ? 'Completed' : 'Open',
           rawStatus: t.status,
           priority: t.priority || 'HIGH',
-          dueDate: t.dueDate || 'Sep 26, 2026 08:00 AM',
+          dueDate: t.dueDate || 'Today',
           relatedContactId: t.relatedContactId,
-          relatedContactName: t.relatedContactName || 'Robert Vance',
+          relatedContactName: t.relatedContactName,
           assignedToId: t.assignedToId || currentUser.id,
           assignedToName: t.assignedToName || currentUser.name,
           createdAt: t.createdAt
@@ -144,9 +134,25 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     }
   };
 
+  const fetchContacts = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('http://localhost:5000/api/v1/contacts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setDbContacts(json.data);
+      }
+    } catch (e) {
+      // Fallback
+    }
+  };
+
   useEffect(() => {
     fetchTasks();
     fetchUsers();
+    fetchContacts();
   }, []);
 
   const openCreateModal = () => {
@@ -155,13 +161,15 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     setNewTaskDesc('');
     setNewTaskContactId('');
     setNewTaskAssignedTo(currentUser.id);
-    setNewTaskDueDate('2026-09-26');
+    const today = new Date().toISOString().split('T')[0];
+    setNewTaskDueDate(today);
     setNewTaskDueTime('08:00 AM (CDT)');
     setNewTaskIsRecurring(false);
     setShowAddTaskModal(true);
   };
 
   const openEditModal = (task: any) => {
+    if (!isAdmin) return;
     setEditingTaskId(task.id);
     setNewTaskTitle(task.title || '');
     setNewTaskDesc(task.description || '');
@@ -177,7 +185,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    const matchedContact = contacts.find(c => c.id === newTaskContactId);
+    const availableContactsList = dbContacts.length > 0 ? dbContacts : contacts;
+    const matchedContact = availableContactsList.find((c: any) => c.id === newTaskContactId);
     const availableList = dbUsers.length > 0 ? dbUsers : users;
     const matchedUser = availableList.find((u: any) => u.id === newTaskAssignedTo);
     const assignedName = matchedUser?.name || (matchedUser ? `${matchedUser.firstName} ${matchedUser.lastName}` : currentUser.name);
@@ -312,6 +321,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   };
 
   const handleDeleteTask = async (taskId: string) => {
+    if (!isAdmin) return;
     if (!confirm('Are you sure you want to delete this task?')) return;
     setApiTasks(prev => prev.filter(t => t.id !== taskId));
     try {
@@ -340,8 +350,19 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     );
   };
 
+  const isReadOnly = currentUser.role === 'READ_ONLY';
+  const isAdmin = currentUser.role === 'ADMIN';
+
   // Filter Tasks
   const filteredTasks = apiTasks.filter(t => {
+    // Role-based visibility check: non-admins only see tasks assigned to them
+    if (!isAdmin) {
+      const isAssigned = t.assignedToId === currentUser.id || 
+        t.assignedToName?.toLowerCase() === currentUser.name?.toLowerCase() ||
+        (t.assignedTo && t.assignedTo.email === currentUser.email);
+      if (!isAssigned) return false;
+    }
+
     const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase()) ||
       t.description?.toLowerCase().includes(search.toLowerCase()) ||
       (t.relatedContactName && t.relatedContactName.toLowerCase().includes(search.toLowerCase()));
@@ -368,11 +389,16 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     return 0;
   });
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
+  const visibleTasks = isAdmin ? apiTasks : apiTasks.filter(t => 
+    t.assignedToId === currentUser.id || 
+    t.assignedToName?.toLowerCase() === currentUser.name?.toLowerCase() ||
+    (t.assignedTo && t.assignedTo.email === currentUser.email)
+  );
+
   const availableUsersList = dbUsers.length > 0 ? dbUsers : users;
 
-  const dueTodayCount = apiTasks.filter(t => (t.status === 'Open' || t.rawStatus === 'PENDING') && (t.dueDate?.toLowerCase().includes('today') || t.dueDate?.includes('Sep 16'))).length;
-  const overdueCount = apiTasks.filter(t => (t.status === 'Open' || t.rawStatus === 'PENDING') && (t.dueDate?.includes('Aug') || t.dueDate?.includes('Jun'))).length;
+  const dueTodayCount = visibleTasks.filter(t => (t.status === 'Open' || t.rawStatus === 'PENDING') && (t.dueDate?.toLowerCase().includes('today') || t.dueDate?.includes('Sep 16'))).length;
+  const overdueCount = visibleTasks.filter(t => (t.status === 'Open' || t.rawStatus === 'PENDING') && (t.dueDate?.includes('Aug') || t.dueDate?.includes('Jun'))).length;
 
   return (
     <div className="space-y-4 max-w-full pb-16">
@@ -384,7 +410,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
             Tasks
           </h1>
           <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-[#EAF2FF] text-[#155EEF]">
-            {apiTasks.length} Tasks
+            {visibleTasks.length} Tasks
           </span>
         </div>
 
@@ -420,7 +446,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
         >
           <span>= All</span>
           <span className={`text-[11px] px-1.5 py-0.2 rounded-full ${activeTab === 'ALL' ? 'bg-white/20 text-white' : 'bg-[#E2E8F0] text-[#475569]'}`}>
-            {apiTasks.length}
+            {visibleTasks.length}
           </span>
         </button>
 
@@ -434,7 +460,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
         >
           <Clock className="w-3.5 h-3.5 text-blue-500" />
           <span>Due today</span>
-          <span className="text-[11px] text-[#64748B]">{dueTodayCount || 2}</span>
+          <span className="text-[11px] text-[#64748B]">{dueTodayCount}</span>
         </button>
 
         <button
@@ -671,23 +697,25 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {!isReadOnly && (
-                            <button
-                              onClick={() => openEditModal(task)}
-                              className="p-1 rounded-lg text-[#94A3B8] hover:text-[#155EEF] hover:bg-[#EAF2FF] transition-colors cursor-pointer"
-                              title="Edit Task"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {!isReadOnly && (
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="p-1 rounded-lg text-[#94A3B8] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Delete Task"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          {isAdmin ? (
+                            <>
+                              <button
+                                onClick={() => openEditModal(task)}
+                                className="p-1 rounded-lg text-[#94A3B8] hover:text-[#155EEF] hover:bg-[#EAF2FF] transition-colors cursor-pointer"
+                                title="Edit Task"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTask(task.id)}
+                                className="p-1 rounded-lg text-[#94A3B8] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Delete Task"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[#94A3B8] text-[11px]">-</span>
                           )}
                         </div>
                       </td>
@@ -767,9 +795,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                     className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs text-[#0F172A] focus:outline-none focus:border-[#155EEF] focus:ring-1 focus:ring-[#155EEF] cursor-pointer"
                   >
                     <option value="">None (No Contact Linked)</option>
-                    {contacts.map(c => (
+                    {(dbContacts.length > 0 ? dbContacts : contacts).map((c: any) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} {c.brokerage ? `(${c.brokerage})` : ''}
+                        {c.name} {c.brokerage ? `(${c.brokerage})` : (c.phone ? `(${c.phone})` : '')}
                       </option>
                     ))}
                   </select>
