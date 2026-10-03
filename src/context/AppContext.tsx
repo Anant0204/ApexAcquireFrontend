@@ -774,8 +774,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Updated deal parameters`, `Deal #${dealId}`);
   };
 
-  const archiveDeal = (dealId: string) => {
+  const archiveDeal = async (dealId: string) => {
+    // Optimistic UI update
     setDeals(prev => prev.map(d => d.id === dealId ? { ...d, isArchived: true, stage: 'TRASH' } : d));
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token && !dealId.startsWith('dl-')) {
+        await fetch(`http://localhost:5000/api/v1/deals/${dealId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to archive deal on server', err);
+    }
     logAuditAction(`Soft-deleted (archived) deal`, `Deal #${dealId}`);
   };
 
