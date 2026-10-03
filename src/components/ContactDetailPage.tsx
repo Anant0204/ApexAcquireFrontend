@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { RealtorContact, ContactTemperature, OutreachStage, DealStage, Grade } from '../types/crm';
 import { useApp } from '../context/AppContext';
 import {

@@ -166,7 +166,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json.success && Array.isArray(json.data)) {
           const normalized: PropertyDeal[] = json.data.map((d: any) => ({
             id: d.id,
             address: d.address || '',
