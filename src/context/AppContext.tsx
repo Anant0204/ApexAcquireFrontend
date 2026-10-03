@@ -126,46 +126,46 @@ interface AppContextType {
 const INITIAL_INTEGRATIONS: GatewayIntegrationsConfig = {
   sms: {
     provider: 'Twilio',
-    accountSid: 'AC74829103829104829103819',
-    authToken: 'auth_tok_991820491823901',
-    fromPhone: '+1 (469) 782-9901',
-    webhookUrl: 'https://api.apexacquire.com/v1/sms/inbound',
-    isConnected: true,
-    lastTested: 'Today, 10:30 AM'
+    accountSid: '',
+    authToken: '',
+    fromPhone: '',
+    webhookUrl: '',
+    isConnected: false,
+    lastTested: 'Never'
   },
   email: {
     provider: 'Microsoft 365 / Outlook OAuth',
-    host: 'smtp.office365.com',
-    port: 587,
-    username: 'alex.vance@apexacquire.com',
-    passwordOrKey: 'ms_live_oauth_sec_9901842',
-    fromEmail: 'outreach@apexacquire.com',
-    fromName: 'Alexander Vance - Apex Capital',
+    host: '',
+    port: '' as unknown as number,
+    username: '',
+    passwordOrKey: '',
+    fromEmail: '',
+    fromName: '',
     useTls: true,
-    isConnected: true,
-    lastTested: 'Today, 09:15 AM'
+    isConnected: false,
+    lastTested: 'Never'
   },
   ai: {
     provider: 'OpenAI (GPT-4o)',
-    apiKey: 'sk-proj-9928104928104829104812',
-    model: 'gpt-4o',
-    baseUrl: 'https://api.openai.com/v1',
+    apiKey: '',
+    model: '',
+    baseUrl: '',
     temperature: 0.3,
     maxTokens: 500,
-    isConnected: true,
-    lastTested: 'Today, 11:00 AM'
+    isConnected: false,
+    lastTested: 'Never'
   },
   webhooks: {
-    inboundLeadUrl: 'https://api.apexacquire.com/v1/webhooks/inbound-leads',
-    outboundDealUrl: 'https://hooks.zapier.com/hooks/catch/918204/apex-deals',
-    secretToken: 'whsec_99812401824901824',
+    inboundLeadUrl: '',
+    outboundDealUrl: '',
+    secretToken: '',
     events: {
       onLeadCreated: true,
       onHumanTakeover: true,
       onOfferAccepted: true,
       onOutreachEnrolled: false
     },
-    isConnected: true
+    isConnected: false
   }
 };
 
@@ -173,8 +173,11 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<UserProfile[]>(MOCK_USERS);
-  const [currentUser, setCurrentUser] = useState<UserProfile>(MOCK_USERS[0]); // Admin default
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem('currentUser');
+    return saved ? JSON.parse(saved) : MOCK_USERS[0];
+  }); // Admin default
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('accessToken'));
   
   const [contacts, setContacts] = useState<RealtorContact[]>(INITIAL_CONTACTS);
   const [conversations, setConversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
@@ -245,6 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);
         localStorage.setItem('accessToken', data.data.accessToken);
+        localStorage.setItem('currentUser', JSON.stringify(mappedUser));
         if (data.data.refreshToken) {
           localStorage.setItem('refreshToken', data.data.refreshToken);
         }
@@ -260,6 +264,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     setIsAuthenticated(false);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('currentUser');
   };
 
   const addUser = (userData: Omit<UserProfile, 'id'>) => {

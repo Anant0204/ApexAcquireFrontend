@@ -13,6 +13,7 @@ import { ConversationsPage } from './components/ConversationsPage';
 import { TemplatesAutomationsPage } from './components/TemplatesAutomationsPage';
 import { ReportsPage } from './components/ReportsPage';
 import { SettingsPage } from './components/SettingsPage';
+import { MarketingPage } from './components/MarketingPage';
 import { DealDetailDrawer } from './components/DealDetailDrawer';
 import { ClickToCallModal } from './components/ClickToCallModal';
 import { SystemTutorialModal } from './components/SystemTutorialModal';
@@ -39,10 +40,10 @@ const App: React.FC = () => {
 
   // Navigation Access Matrix across roles
   const allowedTabs: Record<string, string[]> = {
-    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
-    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates', 'reports', 'settings'],
-    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'templates'],
-    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'reports']
+    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'],
+    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'],
+    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates'],
+    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'marketing', 'reports']
   };
 
   const userRole = currentUser?.role || 'READ_ONLY';
@@ -124,6 +125,7 @@ const App: React.FC = () => {
           <Route path={`/${rolePath}/conversations`} element={<ConversationsPage onOpenCallModal={setCallingContact} />} />
           <Route path={`/${rolePath}/tasks`} element={<TasksPage onNavigate={handleNavigateWithTarget} />} />
           <Route path={`/${rolePath}/contacts`} element={<ContactsPage onSelectContact={setSelectedContact} onOpenCallModal={setCallingContact} />} />
+          <Route path={`/${rolePath}/marketing`} element={<MarketingPage />} />
           <Route path={`/${rolePath}/templates`} element={<TemplatesAutomationsPage />} />
           <Route path={`/${rolePath}/reports`} element={<ReportsPage />} />
           <Route path={`/${rolePath}/settings`} element={<SettingsPage />} />
