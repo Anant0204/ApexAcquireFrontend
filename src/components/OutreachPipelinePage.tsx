@@ -199,17 +199,79 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
     e.dataTransfer.dropEffect = 'move';
   };
 
+  const handleStageChange = async (contactId: string, targetStage: OutreachStage) => {
+    // 1. Optimistically update local API contacts so the card moves immediately to target stage
+    setApiContacts(prev => prev.map(c => {
+      if (c.id === contactId) {
+        return {
+          ...c,
+          outreachStage: targetStage,
+          status: targetStage
+        };
+      }
+      return c;
+    }));
+
+    // 2. Update context for task triggers and audits
+    updateContactStage(contactId, targetStage);
+
+    // 3. Persist to Backend MySQL Database
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`http://localhost:5000/api/v1/contacts/${contactId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: targetStage,
+          outreachStage: targetStage
+        })
+      });
+    } catch (err) {
+      console.error('Failed to update stage in backend:', err);
+    }
+  };
+
+  const handleTemperatureChange = async (contactId: string, newTemp: ContactTemperature) => {
+    // Optimistic UI update
+    setApiContacts(prev => prev.map(c => {
+      if (c.id === contactId) {
+        return { ...c, temperature: newTemp };
+      }
+      return c;
+    }));
+
+    updateContactTemperature(contactId, newTemp);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`http://localhost:5000/api/v1/contacts/${contactId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ temperature: newTemp })
+      });
+    } catch (err) {
+      console.error('Failed to update temperature in backend:', err);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent, targetStage: OutreachStage) => {
     e.preventDefault();
     const contactId = e.dataTransfer.getData('contactId') || e.dataTransfer.getData('text/plain');
     if (contactId && currentUser.role !== 'READ_ONLY') {
-      updateContactStage(contactId, targetStage);
+      handleStageChange(contactId, targetStage);
     }
   };
 
-  const handleRecycle = (contact: RealtorContact) => {
+  const handleRecycle = async (contact: RealtorContact) => {
+    handleStageChange(contact.id, 'Queued for Outreach');
     recycleContactToQueued(contact.id);
-    setRecycledToast(`${contact.name} recycled back to "Queued for Outreach" (Recycle #${(contact.sequenceInfo.recycleCount || 0) + 1})`);
+    setRecycledToast(`${contact.name} recycled back to "Queued for Outreach" (Recycle #${(contact.sequenceInfo?.recycleCount || 0) + 1})`);
     setTimeout(() => setRecycledToast(null), 4000);
   };
 
@@ -388,7 +450,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                         <select
                           value={contact.temperature}
                           disabled={isReadOnly}
-                          onChange={(e) => updateContactTemperature(contact.id, e.target.value as ContactTemperature)}
+                          onChange={(e) => handleTemperatureChange(contact.id, e.target.value as ContactTemperature)}
                           className={`text-[10px] font-extrabold px-2 py-0.5 rounded-lg border cursor-pointer focus:outline-none shadow-2xs ${
                             contact.temperature === 'Hot' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                             contact.temperature === 'Warm' ? 'bg-amber-50 text-amber-700 border-amber-200' :
@@ -436,14 +498,14 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                         <div className="space-y-1">
                           <div className="flex justify-between text-[9px] font-bold text-[#475569]">
                             <span>Cadence Progress</span>
-                            <span className="text-[#155EEF]">Touch {contact.sequenceInfo.currentTouch}/5</span>
+                            <span className="text-[#155EEF]">Touch {contact.sequenceInfo?.currentTouch || 0}/5</span>
                           </div>
                           <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full overflow-hidden flex">
                             {[1, 2, 3, 4, 5].map((t) => (
                               <div
                                 key={t}
                                 className={`flex-1 border-r border-white ${
-                                  t <= contact.sequenceInfo.currentTouch ? 'bg-[#155EEF]' : 'bg-[#E2E8F0]'
+                                  t <= (contact.sequenceInfo?.currentTouch || 0) ? 'bg-[#155EEF]' : 'bg-[#E2E8F0]'
                                 }`}
                               />
                             ))}
@@ -452,11 +514,21 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setApiContacts(prev => prev.map(c => {
+                                  if (c.id === contact.id) {
+                                    const curr = c.sequenceInfo?.currentTouch || 0;
+                                    return {
+                                      ...c,
+                                      sequenceInfo: { ...c.sequenceInfo, currentTouch: Math.min(5, curr + 1) }
+                                    };
+                                  }
+                                  return c;
+                                }));
                                 advanceContactSequence(contact.id);
                               }}
-                              className="w-full mt-1.5 py-1 bg-[#EAF2FF] hover:bg-[#DBEAFE] text-[#155EEF] text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition-colors"
+                              className="w-full mt-1.5 py-1 bg-[#EAF2FF] hover:bg-[#DBEAFE] text-[#155EEF] text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer"
                             >
-                              <Play className="w-3 h-3" /> Advance to Touch {Math.min(5, contact.sequenceInfo.currentTouch + 1)}
+                              <Play className="w-3 h-3" /> Advance to Touch {Math.min(5, (contact.sequenceInfo?.currentTouch || 0) + 1)}
                             </button>
                           )}
                         </div>
@@ -467,17 +539,17 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                         <div className="space-y-1">
                           <div className="flex justify-between text-[9px] font-bold text-[#8B5CF6]">
                             <span>30-Day Nurture Loop</span>
-                            <span>Day {contact.sequenceInfo.nurtureDay || 18}/30</span>
+                            <span>Day {contact.sequenceInfo?.nurtureDay || 18}/30</span>
                           </div>
                           <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full overflow-hidden">
                             <div 
                               className="bg-gradient-to-r from-[#8B5CF6] to-[#A855F7] h-full rounded-full" 
-                              style={{ width: `${((contact.sequenceInfo.nurtureDay || 18) / 30) * 100}%` }}
+                              style={{ width: `${(((contact.sequenceInfo?.nurtureDay || 18)) / 30) * 100}%` }}
                             />
                           </div>
 
                           <div className="flex items-center justify-between text-[9px] text-[#64748B] pt-0.5">
-                            <span>Recycled: <strong>{contact.sequenceInfo.recycleCount || 0}x</strong></span>
+                            <span>Recycled: <strong>{contact.sequenceInfo?.recycleCount || 0}x</strong></span>
                             <span className="text-[#8B5CF6] font-semibold">Auto-recycles on Day 30</span>
                           </div>
 
@@ -487,7 +559,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                                 e.stopPropagation();
                                 handleRecycle(contact);
                               }}
-                              className="w-full mt-1.5 py-1.5 bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-xs hover:opacity-90 transition-opacity"
+                              className="w-full mt-1.5 py-1.5 bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
                             >
                               <RotateCcw className="w-3 h-3" /> Recycle to Queued Now
                             </button>
@@ -515,7 +587,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                                 e.stopPropagation();
                                 onOpenCallModal(contact);
                               }}
-                              className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[9px] flex items-center gap-1 transition-colors"
+                              className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded text-[9px] flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <PhoneCall className="w-2.5 h-2.5" /> Call Now
                             </button>
@@ -549,7 +621,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                         <select
                           value={contact.outreachStage}
                           onChange={(e) => {
-                            updateContactStage(contact.id, e.target.value as OutreachStage);
+                            handleStageChange(contact.id, e.target.value as OutreachStage);
                           }}
                           className="text-[10px] font-bold bg-[#F1F6FC] hover:bg-[#EAF2FF] text-[#0B1F3A] border border-[#CBD5E1] hover:border-[#155EEF] rounded-lg px-2 py-1 focus:outline-none focus:border-[#155EEF] transition-colors cursor-pointer w-full max-w-[170px] truncate"
                         >
@@ -566,7 +638,11 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
                 ))}
 
                 {stageContacts.length === 0 && (
-                  <div className="h-24 border-2 border-dashed border-[#CBD5E1] rounded-2xl flex flex-col items-center justify-center text-[10px] text-[#94A3B8] gap-1 bg-white/60">
+                  <div 
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, stage)}
+                    className="h-24 border-2 border-dashed border-[#CBD5E1] rounded-2xl flex flex-col items-center justify-center text-[10px] text-[#94A3B8] gap-1 bg-white/60 hover:bg-[#F1F6FC] transition-colors"
+                  >
                     <span>Drop Contact Here</span>
                   </div>
                 )}

@@ -37,6 +37,18 @@ export interface OutreachSequenceInfo {
   channel: 'sms' | 'email' | 'omnichannel';
 }
 
+export interface WholesalerInfo {
+  targetRehabSpread?: string;
+  preferredClosingTimeline?: string;
+  proofOfFundsStatus?: string;
+}
+
+export interface ContractGenerationDefaults {
+  buyerEntity?: string;
+  titleCompany?: string;
+  standardEarnestMoney?: string;
+}
+
 export interface RealtorContact {
   id: string;
   name: string;
@@ -59,6 +71,8 @@ export interface RealtorContact {
   notes: string[];
   isArchived?: boolean;
   propertyDealIds?: string[];
+  wholesalerInfo?: WholesalerInfo;
+  contractDefaults?: ContractGenerationDefaults;
 }
 
 export type TaskType = 'human_touch' | 'lead_created' | 'need_help' | 'phone_call' | 'general';
@@ -69,17 +83,23 @@ export interface CRMTask {
   id: string;
   title: string;
   description: string;
-  type: TaskType;
-  priority: TaskPriority;
+  type?: TaskType;
+  priority?: TaskPriority;
   status: TaskStatus;
-  assignedToId: string;
-  assignedToName: string;
+  assignedTo?: string;
+  assignedToId?: string;
+  assignedToName?: string;
+  assignedToInitials?: string;
   dueDate: string;
+  dueTime?: string;
   relatedContactId?: string;
   relatedContactName?: string;
+  relatedContactInitials?: string;
   relatedDealId?: string;
   relatedDealAddress?: string;
   relatedConversationId?: string;
+  isRecurring?: boolean;
+  repeatFrequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   createdAt: string;
   completedAt?: string;
 }
@@ -142,6 +162,13 @@ export interface Conversation {
 }
 
 export type DealStage = 
+  | 'New'
+  | 'Reviewing'
+  | 'Offer'
+  | 'Negotiation'
+  | 'Contract'
+  | 'Closed'
+  | 'Lost'
   | 'New Property' 
   | 'Qualifying' 
   | 'Offer Made' 
@@ -150,6 +177,15 @@ export type DealStage =
   | 'TRASH' 
   | 'Duplicate Lead' 
   | 'Need Help';
+
+export interface DealActivity {
+  id: string;
+  type: 'created' | 'stage_changed' | 'temperature_changed' | 'assigned' | 'underwriting_updated' | 'offer_created' | 'contract_generated' | 'note_added' | 'message_received';
+  title: string;
+  description: string;
+  timestamp: string;
+  actor: string;
+}
 
 export interface PropertyDeal {
   id: string;
@@ -163,12 +199,14 @@ export interface PropertyDeal {
   beds: number;
   baths: number;
   sqft: number;
+  lotSize?: string;
   yearBuilt: number;
   propertyType: string;
   stage: DealStage;
   isAiInbound: boolean;
   ownerId: string;
   ownerName: string;
+  ownerAvatar?: string;
   grade: Grade;
   score: number;
   temperature?: ContactTemperature;
@@ -176,15 +214,34 @@ export interface PropertyDeal {
   realtorBrokerage: string;
   realtorPhone: string;
   realtorEmail: string;
+  realtorLicense?: string;
   createdAt: string;
   updatedAt: string;
   source: string;
+  lastActivity?: string;
   isArchived?: boolean;
+  managerArvStatus?: 'Need Manager ARV' | 'ARV RAN' | 'Manager Approved ARV';
+  arvApprovedBy?: string;
+  arvApprovedAt?: string;
   underwriting?: {
+    marketValue?: number;
     arv: number;
     estimatedRehab: number;
-    targetWholesaleFee: number;
+    closingCosts?: number;
+    holdingCosts?: number;
+    targetWholesaleFee?: number;
     calculatedMao: number;
+    // Multi-Tier MAO (Podio replication)
+    mao80?: number;
+    mao77?: number;
+    mao75?: number;
+    mao70?: number;
+    estimatedRent?: number;
+    conditionNotes?: string;
+    majorWorkItems?: string[];
+    offerPrice?: number;
+    estimatedProfit?: number;
+    roi?: number;
   };
   offerDetails?: {
     purchasePrice: number;
@@ -204,10 +261,14 @@ export interface PropertyDeal {
     templateName: string;
     fileName: string;
     fileType: 'pdf' | 'docx';
+    status?: 'Draft' | 'Sent for Signature' | 'Executed' | 'Archived';
     generatedAt: string;
     generatedBy: string;
     version: number;
+    documentUrl?: string;
+    purchasePrice?: number;
   }>;
+  activities?: DealActivity[];
 }
 
 export interface EmailTemplate {
@@ -262,4 +323,50 @@ export interface AuditLogItem {
   action: string;
   timestamp: string;
   affectedRecord: string;
+}
+
+export interface GatewayIntegrationsConfig {
+  sms: {
+    provider: string;
+    accountSid: string;
+    authToken: string;
+    fromPhone: string;
+    webhookUrl: string;
+    isConnected: boolean;
+    lastTested?: string;
+  };
+  email: {
+    provider: string;
+    host: string;
+    port: number;
+    username: string;
+    passwordOrKey: string;
+    fromEmail: string;
+    fromName: string;
+    useTls: boolean;
+    isConnected: boolean;
+    lastTested?: string;
+  };
+  ai: {
+    provider: string;
+    apiKey: string;
+    model: string;
+    baseUrl?: string;
+    temperature: number;
+    maxTokens: number;
+    isConnected: boolean;
+    lastTested?: string;
+  };
+  webhooks: {
+    inboundLeadUrl: string;
+    outboundDealUrl: string;
+    secretToken: string;
+    events: {
+      onLeadCreated: boolean;
+      onHumanTakeover: boolean;
+      onOfferAccepted: boolean;
+      onOutreachEnrolled: boolean;
+    };
+    isConnected: boolean;
+  };
 }

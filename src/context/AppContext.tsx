@@ -12,9 +12,11 @@ import type {
   OutreachStage, 
   ContactTemperature,
   CRMTask,
+  DealActivity,
   EmailTemplate,
   WorkflowRule,
-  AIPersonalityConfig
+  AIPersonalityConfig,
+  GatewayIntegrationsConfig
 } from '../types/crm';
 import { 
   MOCK_USERS, 
@@ -71,8 +73,10 @@ interface AppContextType {
   addDeal: (deal: Omit<PropertyDeal, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateDealStage: (dealId: string, newStage: DealStage) => void;
   updateDeal: (dealId: string, updates: Partial<PropertyDeal>) => void;
+  assignDeal: (dealId: string, userId: string, userName: string, userAvatar?: string) => void;
+  addDealActivity: (dealId: string, activity: { type: string; title: string; description: string; actor?: string }) => void;
   archiveDeal: (dealId: string) => void;
-  addGeneratedContract: (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string }) => void;
+  addGeneratedContract: (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string; purchasePrice?: number; status?: 'Draft' | 'Sent for Signature' | 'Executed' | 'Archived' }) => void;
   claimLead: (conversationId: string, assignedUserId?: string, assignedUserName?: string) => void;
 
   // Tasks State & Actions
@@ -113,7 +117,57 @@ interface AppContextType {
     gradeWeights: { response: number; address: number; price: number; timeline: number };
   };
   updateSettings: (newSettings: Partial<AppContextType['settings']>) => void;
+
+  // Integrations & Gateway Credentials
+  integrations: GatewayIntegrationsConfig;
+  updateIntegrations: (updates: Partial<GatewayIntegrationsConfig>) => void;
 }
+
+const INITIAL_INTEGRATIONS: GatewayIntegrationsConfig = {
+  sms: {
+    provider: 'Twilio',
+    accountSid: 'AC74829103829104829103819',
+    authToken: 'auth_tok_991820491823901',
+    fromPhone: '+1 (469) 782-9901',
+    webhookUrl: 'https://api.apexacquire.com/v1/sms/inbound',
+    isConnected: true,
+    lastTested: 'Today, 10:30 AM'
+  },
+  email: {
+    provider: 'Microsoft 365 / Outlook OAuth',
+    host: 'smtp.office365.com',
+    port: 587,
+    username: 'alex.vance@apexacquire.com',
+    passwordOrKey: 'ms_live_oauth_sec_9901842',
+    fromEmail: 'outreach@apexacquire.com',
+    fromName: 'Alexander Vance - Apex Capital',
+    useTls: true,
+    isConnected: true,
+    lastTested: 'Today, 09:15 AM'
+  },
+  ai: {
+    provider: 'OpenAI (GPT-4o)',
+    apiKey: 'sk-proj-9928104928104829104812',
+    model: 'gpt-4o',
+    baseUrl: 'https://api.openai.com/v1',
+    temperature: 0.3,
+    maxTokens: 500,
+    isConnected: true,
+    lastTested: 'Today, 11:00 AM'
+  },
+  webhooks: {
+    inboundLeadUrl: 'https://api.apexacquire.com/v1/webhooks/inbound-leads',
+    outboundDealUrl: 'https://hooks.zapier.com/hooks/catch/918204/apex-deals',
+    secretToken: 'whsec_99812401824901824',
+    events: {
+      onLeadCreated: true,
+      onHumanTakeover: true,
+      onOfferAccepted: true,
+      onOutreachEnrolled: false
+    },
+    isConnected: true
+  }
+};
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -137,6 +191,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
 
+  const [integrations, setIntegrations] = useState<GatewayIntegrationsConfig>(INITIAL_INTEGRATIONS);
+
   const [settings, setSettings] = useState({
     cadenceIntervalDays: 3,
     sendingHoursStart: '08:00',
@@ -146,6 +202,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     globalAiEnabled: true,
     gradeWeights: { response: 25, address: 35, price: 20, timeline: 20 }
   });
+
+  const updateIntegrations = (updates: Partial<GatewayIntegrationsConfig>) => {
+    setIntegrations(prev => ({
+      ...prev,
+      ...updates
+    }));
+    logAuditAction('Updated Gateway Integrations Credentials', 'Settings / Integrations');
+  };
+
 
   const setCurrentUserRole = (role: UserRole) => {
     const userForRole = users.find(u => u.role === role) || {
@@ -228,7 +293,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateContact = (id: string, updates: Partial<RealtorContact>) => {
-    setContacts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    setContacts(prev => {
+      const exists = prev.some(c => c.id === id);
+      if (!exists) {
+        return [...prev, { id, ...updates } as RealtorContact];
+      }
+      return prev.map(c => c.id === id ? { ...c, ...updates } : c);
+    });
+
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      fetch(`http://localhost:5000/api/v1/contacts/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      }).catch(err => console.error('Failed to sync contact update to backend', err));
+    }
+
     logAuditAction(`Updated contact details`, `Contact #${id}`);
   };
 
@@ -443,12 +527,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       beds: conv.propertyCaptured.beds || 3,
       baths: conv.propertyCaptured.baths || 2,
       sqft: conv.propertyCaptured.sqft || 2000,
+      lotSize: '0.25 Acres',
       yearBuilt: 2000,
       propertyType: 'Single Family Residence',
-      stage: 'New Property',
+      stage: 'New',
       isAiInbound: true,
       ownerId: conv.assignedOwnerId || currentUser.id,
       ownerName: conv.assignedOwnerName || currentUser.name,
+      ownerAvatar: (conv.assignedOwnerName || currentUser.name).split(' ').map(n => n[0]).join('').toUpperCase(),
       grade: conv.grade,
       score: conv.score,
       temperature: conv.temperature || 'Hot',
@@ -456,15 +542,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       realtorBrokerage: conv.brokerage,
       realtorPhone: conv.realtorPhone,
       realtorEmail: conv.realtorEmail,
-      createdAt: 'Just now',
+      createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       updatedAt: 'Just now',
       source: 'AI Outreach Capture',
+      lastActivity: 'Lead cloned from AI Conversation into AI Deals',
       underwriting: {
+        marketValue: Math.round((conv.propertyCaptured.askingPrice || 500000) * 1.2),
         arv: Math.round((conv.propertyCaptured.askingPrice || 500000) * 1.25),
         estimatedRehab: 45000,
+        closingCosts: 8000,
+        holdingCosts: 6000,
         targetWholesaleFee: 25000,
-        calculatedMao: Math.round((conv.propertyCaptured.askingPrice || 500000) * 0.95)
-      }
+        calculatedMao: Math.round((conv.propertyCaptured.askingPrice || 500000) * 0.95),
+        offerPrice: Math.round((conv.propertyCaptured.askingPrice || 500000) * 0.90),
+        estimatedProfit: 25000,
+        roi: 20.5
+      },
+      activities: [
+        {
+          id: `act-${Date.now()}`,
+          type: 'created',
+          title: 'Deal Created from AI Conversation',
+          description: `Captured address ${conv.propertyCaptured.address} from dialogue with ${conv.realtorName}.`,
+          timestamp: 'Just now',
+          actor: 'Apex AI Bot'
+        }
+      ]
     };
 
     setDeals(prev => [newDeal, ...prev]);
@@ -509,10 +612,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Deals Handlers
   const addDeal = (dealData: Omit<PropertyDeal, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const now = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthStr = monthNames[now.getMonth()];
+    const dayStr = String(now.getDate()).padStart(2, '0');
+    const yearStr = now.getFullYear();
+    const hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const formattedHours = hours % 12 || 12;
+    const dateFormatted = `${monthStr} ${dayStr}, ${yearStr} ${String(formattedHours).padStart(2, '0')}:${minutes} ${ampm}`;
+
     const newDeal: PropertyDeal = {
       ...dealData,
       id: `dl-${Date.now()}`,
-      createdAt: 'Just now',
+      createdAt: dateFormatted,
       updatedAt: 'Just now'
     };
     setDeals(prev => [newDeal, ...prev]);
@@ -531,19 +645,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Manually created deal for ${newDeal.address}`, `Deal #${newDeal.id}`);
   };
 
+  const assignDeal = (dealId: string, userId: string, userName: string, userAvatar?: string) => {
+    const activityObj: DealActivity = {
+      id: `act-${Date.now()}`,
+      type: 'assigned',
+      title: `Assigned to ${userName}`,
+      description: `Deal ownership transferred to ${userName}.`,
+      timestamp: 'Just now',
+      actor: currentUser.name
+    };
+
+    setDeals(prev => prev.map(d => {
+      if (d.id === dealId) {
+        const existingActivities = d.activities || [];
+        return {
+          ...d,
+          ownerId: userId,
+          ownerName: userName,
+          ownerAvatar: userAvatar || userName.split(' ').map(n => n[0]).join('').toUpperCase(),
+          updatedAt: 'Just now',
+          lastActivity: `Assigned to ${userName}`,
+          activities: [activityObj, ...existingActivities]
+        };
+      }
+      return d;
+    }));
+
+    logAuditAction(`Assigned deal to ${userName}`, `Deal #${dealId}`);
+  };
+
+  const addDealActivity = (dealId: string, activity: { type: string; title: string; description: string; actor?: string }) => {
+    const activityObj: DealActivity = {
+      id: `act-${Date.now()}`,
+      type: activity.type as any,
+      title: activity.title,
+      description: activity.description,
+      timestamp: 'Just now',
+      actor: activity.actor || currentUser.name
+    };
+
+    setDeals(prev => prev.map(d => {
+      if (d.id === dealId) {
+        const existingActivities = d.activities || [];
+        return {
+          ...d,
+          updatedAt: 'Just now',
+          lastActivity: activity.title,
+          activities: [activityObj, ...existingActivities]
+        };
+      }
+      return d;
+    }));
+  };
+
   const updateDealStage = (dealId: string, newStage: DealStage) => {
     const deal = deals.find(d => d.id === dealId);
     if (!deal) return;
 
-    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage: newStage, updatedAt: 'Just now' } : d));
+    const activityObj: DealActivity = {
+      id: `act-${Date.now()}`,
+      type: 'stage_changed',
+      title: `Stage Changed to ${newStage}`,
+      description: `Deal moved from ${deal.stage} to ${newStage}.`,
+      timestamp: 'Just now',
+      actor: currentUser.name
+    };
+
+    setDeals(prev => prev.map(d => {
+      if (d.id === dealId) {
+        const existingActivities = d.activities || [];
+        return {
+          ...d,
+          stage: newStage,
+          updatedAt: 'Just now',
+          lastActivity: `Moved to ${newStage}`,
+          activities: [activityObj, ...existingActivities]
+        };
+      }
+      return d;
+    }));
 
     // Auto Task Trigger on "Need Help" Deal Stage
-    if (newStage === 'Need Help') {
+    if (newStage === 'Need Help' || newStage === 'Negotiation') {
       const managerUser = users.find(u => u.role === 'MANAGER') || users[0];
       const managerTask: CRMTask = {
         id: `tsk-${Date.now()}`,
         title: `Manager Escalation: ${deal.address} Needs Help`,
-        description: `Deal moved to "Need Help" stage. Requires manager review, price concession, or terms approval.`,
+        description: `Deal moved to "${newStage}" stage. Requires manager review, price concession, or terms approval.`,
         type: 'need_help',
         priority: 'URGENT',
         status: 'PENDING',
@@ -561,8 +749,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Send app notification
       const notif: AppNotification = {
         id: `nt-${Date.now()}`,
-        title: 'Deal Escalation: Need Help',
-        message: `${deal.address} moved to Need Help. Manager task created.`,
+        title: `Deal Stage: ${newStage}`,
+        message: `${deal.address} moved to ${newStage}. Task created.`,
         type: 'task_created',
         timestamp: 'Just now',
         read: false,
@@ -584,21 +772,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Soft-deleted (archived) deal`, `Deal #${dealId}`);
   };
 
-  const addGeneratedContract = (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string }) => {
+  const addGeneratedContract = (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string; purchasePrice?: number; status?: 'Draft' | 'Sent for Signature' | 'Executed' | 'Archived' }) => {
     const contractObj = {
       id: `ctr-${Date.now()}`,
       ...contract,
-      generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: contract.status || 'Draft',
+      generatedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       version: 1
+    };
+
+    const activityObj: DealActivity = {
+      id: `act-${Date.now()}`,
+      type: 'contract_generated',
+      title: `Contract Generated: ${contract.templateName}`,
+      description: `Generated ${contract.fileName} for $${(contract.purchasePrice || 0).toLocaleString()}.`,
+      timestamp: 'Just now',
+      actor: currentUser.name
     };
 
     setDeals(prev => prev.map(d => {
       if (d.id === dealId) {
         const existing = d.generatedContracts || [];
+        const existingActivities = d.activities || [];
         contractObj.version = existing.length + 1;
         return {
           ...d,
-          generatedContracts: [contractObj, ...existing]
+          stage: 'Contract',
+          updatedAt: 'Just now',
+          lastActivity: `Generated ${contract.templateName}`,
+          generatedContracts: [contractObj, ...existing],
+          activities: [activityObj, ...existingActivities]
         };
       }
       return d;
@@ -828,6 +1031,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addDeal,
       updateDealStage,
       updateDeal,
+      assignDeal,
+      addDealActivity,
       archiveDeal,
       addGeneratedContract,
       claimLead,
@@ -851,10 +1056,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       auditLogs,
       logAuditAction,
       settings,
-      updateSettings
+      updateSettings,
+      integrations,
+      updateIntegrations
     }}>
       {children}
     </AppContext.Provider>
+
   );
 };
 

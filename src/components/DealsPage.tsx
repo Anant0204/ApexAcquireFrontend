@@ -12,9 +12,6 @@ import {
   Home,
   Zap,
   AlertTriangle,
-  FileCheck,
-  PhoneCall,
-  DollarSign,
   ArrowRightLeft
 } from 'lucide-react';
 
@@ -33,14 +30,25 @@ const STAGES: DealStage[] = [
   'Need Help'
 ];
 
-const STAGE_CONFIG: Record<DealStage, {
+interface StageVisualConfig {
   label: string;
   shortLabel: string;
   gradientHeader: string;
   glowBg: string;
   badgeStyle: string;
   cardStripe: string;
-}> = {
+}
+
+const DEFAULT_STAGE_CONFIG: StageVisualConfig = {
+  label: 'DEAL',
+  shortLabel: 'Deal',
+  gradientHeader: 'bg-gradient-to-r from-[#0B1F3A] via-[#155EEF] to-[#2563EB] text-white',
+  glowBg: 'bg-[#155EEF]/25',
+  badgeStyle: 'bg-white/20 backdrop-blur-md text-white border border-white/30',
+  cardStripe: 'bg-[#155EEF]'
+};
+
+const STAGE_CONFIG: Partial<Record<DealStage, StageVisualConfig>> = {
   'New Property': {
     label: 'NEW PROPERTY',
     shortLabel: 'New',
@@ -107,6 +115,14 @@ const STAGE_CONFIG: Record<DealStage, {
   }
 };
 
+const getStageConfig = (stage: string): StageVisualConfig => {
+  return (STAGE_CONFIG as Record<string, StageVisualConfig>)[stage] || {
+    ...DEFAULT_STAGE_CONFIG,
+    label: stage.toUpperCase(),
+    shortLabel: stage
+  };
+};
+
 export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
   const { deals, addDeal, updateDealStage, archiveDeal, contacts, currentUser } = useApp();
 
@@ -139,7 +155,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     realtorEmail: ''
   });
 
-  const [apiDeals, setApiDeals] = useState<any[]>([]);
+  const [apiDeals, setApiDeals] = useState<PropertyDeal[]>([]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
@@ -150,15 +166,45 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
-        if (json.success) setApiDeals(json.data);
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const normalized: PropertyDeal[] = json.data.map((d: any) => ({
+            id: d.id,
+            address: d.address || '',
+            city: d.city || '',
+            state: d.state || '',
+            zip: d.zip || '',
+            askingPrice: d.askingPrice || 0,
+            beds: d.propertyDetails?.beds ?? d.beds ?? 3,
+            baths: d.propertyDetails?.baths ?? d.baths ?? 2,
+            sqft: d.propertyDetails?.sqft ?? d.sqft ?? 0,
+            yearBuilt: d.propertyDetails?.yearBuilt ?? d.yearBuilt ?? 2000,
+            propertyType: d.propertyType || 'Single Family Residence',
+            stage: d.stage || 'New Property',
+            temperature: d.temperature || 'Warm',
+            contactId: d.contactId || '',
+            realtorName: d.realtorName || d.contactName || 'Realtor',
+            realtorBrokerage: d.realtorBrokerage || 'Brokerage',
+            isAiInbound: !!d.isAiInbound,
+            ownerId: d.ownerId || currentUser.id,
+            ownerName: d.ownerName || currentUser.name,
+            grade: d.grade || 'B',
+            score: d.score || 80,
+            isArchived: !!d.isArchived,
+            createdAt: d.createdAt || 'Recent',
+            updatedAt: d.updatedAt || 'Recent'
+          }));
+          setApiDeals(normalized);
+        } else {
+          setApiDeals(deals);
+        }
       } catch (e) {
-        console.error(e);
+        setApiDeals(deals);
       } finally {
         setLoading(false);
       }
     };
     fetchDeals();
-  }, []);
+  }, [deals, currentUser]);
 
   const activeDeals = apiDeals.filter(d => !d.isArchived);
 
@@ -186,11 +232,21 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     e.dataTransfer.dropEffect = 'move';
   };
 
+  const handleDealStageChange = (dealId: string, targetStage: DealStage) => {
+    setApiDeals(prev => prev.map(d => {
+      if (d.id === dealId) {
+        return { ...d, stage: targetStage };
+      }
+      return d;
+    }));
+    updateDealStage(dealId, targetStage);
+  };
+
   const handleDrop = (e: React.DragEvent, targetStage: DealStage) => {
     e.preventDefault();
     const dealId = e.dataTransfer.getData('dealId') || e.dataTransfer.getData('text/plain');
     if (dealId && currentUser.role !== 'READ_ONLY') {
-      updateDealStage(dealId, targetStage);
+      handleDealStageChange(dealId, targetStage);
     }
   };
 
@@ -206,7 +262,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     e.preventDefault();
     const selectedContact = contacts.find(c => c.id === newDeal.contactId);
 
-    addDeal({
+    const dealPayload: Omit<PropertyDeal, 'id' | 'createdAt' | 'updatedAt'> = {
       address: newDeal.address,
       city: newDeal.city,
       state: newDeal.state,
@@ -230,7 +286,17 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
       grade: 'B',
       score: 80,
       source: 'Acquisition Desk Manual Entry'
-    });
+    };
+
+    addDeal(dealPayload);
+
+    const createdDeal: PropertyDeal = {
+      ...dealPayload,
+      id: `dl-${Date.now()}`,
+      createdAt: 'Just now',
+      updatedAt: 'Just now'
+    };
+    setApiDeals(prev => [createdDeal, ...prev]);
 
     setShowAddDealModal(false);
   };
@@ -349,7 +415,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
           <span className="text-[10px] uppercase font-bold text-[#64748B] px-1 shrink-0">Jump to:</span>
           {STAGES.map((st) => {
             const count = filteredDeals.filter(d => d.stage === st).length;
-            const conf = STAGE_CONFIG[st];
+            const conf = getStageConfig(st);
             return (
               <button
                 key={st}
@@ -375,7 +441,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
         <div className="kanban-scroll-container flex gap-4 overflow-x-auto pb-8 pt-2 no-scrollbar">
           {STAGES.map((stage) => {
             const stageDeals = filteredDeals.filter(d => d.stage === stage);
-            const conf = STAGE_CONFIG[stage];
+            const conf = getStageConfig(stage);
 
             return (
               <div
@@ -504,7 +570,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                           <select
                             value={deal.stage}
                             onChange={(e) => {
-                              updateDealStage(deal.id, e.target.value as DealStage);
+                              handleDealStageChange(deal.id, e.target.value as DealStage);
                             }}
                             className="text-[10px] font-bold bg-[#F1F6FC] hover:bg-[#EAF2FF] text-[#0B1F3A] border border-[#CBD5E1] hover:border-[#155EEF] rounded-lg px-2 py-1 focus:outline-none focus:border-[#155EEF] transition-colors cursor-pointer w-full max-w-[170px] truncate"
                           >
@@ -550,7 +616,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
             </thead>
             <tbody className="divide-y divide-[#E2E8F0] text-[#0F172A]">
               {filteredDeals.map((deal) => {
-                const conf = STAGE_CONFIG[deal.stage];
+                const conf = getStageConfig(deal.stage);
 
                 return (
                   <tr key={deal.id} className="hover:bg-slate-50 transition-colors">
@@ -723,6 +789,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
               <button
                 onClick={() => {
                   archiveDeal(archivingDealId);
+                  setApiDeals(prev => prev.filter(d => d.id !== archivingDealId));
                   setArchivingDealId(null);
                 }}
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors"
