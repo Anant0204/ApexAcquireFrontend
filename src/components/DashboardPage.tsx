@@ -52,7 +52,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
     return <div className="p-6 text-center text-[#475569]">Loading Dashboard Telemetry...</div>;
   }
 
-  const { metrics: m, activity: a, inbox: i, pipeline: p, aiTelemetry: ai, assignedTasks } = metrics;
+  const { metrics: m, activity: a, inbox: i, pipeline: p, aiTelemetry: ai, assignedTasks, priorityQueue = [] } = metrics;
   const myTasks = Array.isArray(assignedTasks) ? assignedTasks : [];
 
   return (

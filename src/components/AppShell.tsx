@@ -284,7 +284,6 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
             })}
           </div>
 
-<<<<<<< HEAD
           {/* Luxury Sidebar Bottom Sign Out Button */}
           <div className={`p-2 ${collapsed ? 'mx-1' : 'mx-2'} mb-2.5 border-t border-white/10 pt-2.5 relative z-10 shrink-0`}>
             <button
@@ -303,17 +302,6 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                   {currentUser.role.replace('_', ' ')}
                 </span>
               )}
-=======
-          {/* Logout Button */}
-          <div className="px-3 pb-4 pt-2 mt-auto relative z-10">
-            <button
-              onClick={() => logout()}
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-[#1E294B] text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#EF4444]/10 hover:border-[#EF4444]/30 ${collapsed ? 'px-0' : 'px-3'}`}
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-              {!collapsed && <span>Sign Out</span>}
->>>>>>> 0e3e48f4dc5342782bada49215313d357902b115
             </button>
           </div>
         </aside>
@@ -342,7 +330,6 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                   ))}
                 </div>
               </div>
-<<<<<<< HEAD
 
               {/* Mobile Drawer Logout */}
               <div className="border-t border-white/10 pt-3">
@@ -355,30 +342,6 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
                 >
                   <LogOut className="w-4 h-4 text-rose-400" />
                   <span>Sign Out ({currentUser.name})</span>
-                </button>
-=======
-              <div className="flex-1 py-4 space-y-2 overflow-y-auto">
-                {visibleNavItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavClick(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold ${
-                      activeTab === item.id ? 'sidebar-item-active font-bold' : 'text-[#94A3B8] sidebar-item-hover'
-                    }`}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
->>>>>>> 0e3e48f4dc5342782bada49215313d357902b115
-              </div>
-              <div className="mt-auto pt-4 border-t border-white/10">
-                <button
-                  onClick={() => logout()}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all border border-[#1E294B] text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#EF4444]/10 hover:border-[#EF4444]/30"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Sign Out</span>
                 </button>
               </div>
             </div>

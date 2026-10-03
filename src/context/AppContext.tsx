@@ -293,7 +293,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateContact = (id: string, updates: Partial<RealtorContact>) => {
-    setContacts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    setContacts(prev => {
+      const exists = prev.some(c => c.id === id);
+      if (!exists) {
+        return [...prev, { id, ...updates } as RealtorContact];
+      }
+      return prev.map(c => c.id === id ? { ...c, ...updates } : c);
+    });
+
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      fetch(`http://localhost:5000/api/v1/contacts/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      }).catch(err => console.error('Failed to sync contact update to backend', err));
+    }
+
     logAuditAction(`Updated contact details`, `Contact #${id}`);
   };
 

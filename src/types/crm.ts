@@ -37,6 +37,18 @@ export interface OutreachSequenceInfo {
   channel: 'sms' | 'email' | 'omnichannel';
 }
 
+export interface WholesalerInfo {
+  targetRehabSpread?: string;
+  preferredClosingTimeline?: string;
+  proofOfFundsStatus?: string;
+}
+
+export interface ContractGenerationDefaults {
+  buyerEntity?: string;
+  titleCompany?: string;
+  standardEarnestMoney?: string;
+}
+
 export interface RealtorContact {
   id: string;
   name: string;
@@ -59,6 +71,8 @@ export interface RealtorContact {
   notes: string[];
   isArchived?: boolean;
   propertyDealIds?: string[];
+  wholesalerInfo?: WholesalerInfo;
+  contractDefaults?: ContractGenerationDefaults;
 }
 
 export type TaskType = 'human_touch' | 'lead_created' | 'need_help' | 'phone_call' | 'general';

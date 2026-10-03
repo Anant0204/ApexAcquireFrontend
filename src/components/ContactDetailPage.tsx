@@ -82,8 +82,47 @@ export const ContactDetailPage: React.FC<ContactDetailPageProps> = ({
     logAuditAction 
   } = useApp();
 
-  // Current contact live object
-  const currentContact = contacts.find(c => c.id === contact.id) || contact;
+  const [localContact, setLocalContact] = useState<RealtorContact>(contact);
+  const [dbUsers, setDbUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    setLocalContact(contact);
+  }, [contact]);
+
+  useEffect(() => {
+    const fetchUsersList = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('http://localhost:5000/api/v1/users', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setDbUsers(json.data);
+        }
+      } catch (e) {
+        // Fallback to context users
+      }
+    };
+    fetchUsersList();
+  }, []);
+
+  const availableUsersList = dbUsers.length > 0 ? dbUsers : users;
+
+  // Current contact live object (merging context updates and local state)
+  const contextContact = contacts.find(c => c.id === contact.id);
+  const currentContact = contextContact ? { ...localContact, ...contextContact } : localContact;
+
+  const handleAssignSpecialist = (newOwnerId: string) => {
+    const u = availableUsersList.find((usr: any) => usr.id === newOwnerId);
+    if (u) {
+      const ownerName = u.name || `${u.firstName} ${u.lastName}`;
+      const updates = { ownerId: u.id, ownerName };
+      setLocalContact(prev => ({ ...prev, ...updates }));
+      updateContact(currentContact.id, updates);
+      logAuditAction(`Reassigned contact to ${ownerName}`, `Contact #${currentContact.id}`);
+    }
+  };
 
   // Center Tab State
   const [centerTab, setCenterTab] = useState<'conversations' | 'calls' | 'tasks'>('conversations');
@@ -140,6 +179,38 @@ export const ContactDetailPage: React.FC<ContactDetailPageProps> = ({
   const [tagsList, setTagsList] = useState<string[]>(['realtor', 'agent', 'off-market']);
   const [newTagInput, setNewTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
+
+  // Dynamic Wholesaler Info State
+  const [isEditingWholesaler, setIsEditingWholesaler] = useState(false);
+  const [wholesalerForm, setWholesalerForm] = useState({
+    targetRehabSpread: currentContact.wholesalerInfo?.targetRehabSpread || '$25,000 - $60,000',
+    preferredClosingTimeline: currentContact.wholesalerInfo?.preferredClosingTimeline || '7-14 Days Cash',
+    proofOfFundsStatus: currentContact.wholesalerInfo?.proofOfFundsStatus || 'Verified on File'
+  });
+
+  // Dynamic Contract Generation Defaults State
+  const [isEditingContract, setIsEditingContract] = useState(false);
+  const [contractForm, setContractForm] = useState({
+    buyerEntity: currentContact.contractDefaults?.buyerEntity || 'Momentum Capital Partners LLC',
+    titleCompany: currentContact.contractDefaults?.titleCompany || 'Republic Title DFW',
+    standardEarnestMoney: currentContact.contractDefaults?.standardEarnestMoney || '$2,500'
+  });
+
+  const handleSaveWholesalerInfo = () => {
+    updateContact(currentContact.id, {
+      wholesalerInfo: wholesalerForm
+    });
+    setIsEditingWholesaler(false);
+    logAuditAction(`Updated wholesaler info for ${currentContact.name}`, `Contact #${currentContact.id}`);
+  };
+
+  const handleSaveContractDefaults = () => {
+    updateContact(currentContact.id, {
+      contractDefaults: contractForm
+    });
+    setIsEditingContract(false);
+    logAuditAction(`Updated contract generation defaults for ${currentContact.name}`, `Contact #${currentContact.id}`);
+  };
 
   // Notes state
   const [newNoteText, setNewNoteText] = useState('');
@@ -661,10 +732,90 @@ export const ContactDetailPage: React.FC<ContactDetailPageProps> = ({
               </button>
 
               {expandedSections.wholesaler && (
-                <div className="p-4 pt-1 space-y-2 border-t border-[#F1F5F9] text-xs text-[#475569]">
-                  <div>Target Rehab Spread: <strong>$25,000 - $60,000</strong></div>
-                  <div>Preferred Closing Timeline: <strong>7-14 Days Cash</strong></div>
-                  <div>Proof of Funds: <span className="text-emerald-700 font-bold">Verified on File</span></div>
+                <div className="p-4 pt-2 space-y-2.5 border-t border-[#F1F5F9] text-xs">
+                  {isEditingWholesaler ? (
+                    <div className="space-y-2.5">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">Target Rehab Spread</span>
+                        <input
+                          type="text"
+                          value={wholesalerForm.targetRehabSpread}
+                          onChange={(e) => setWholesalerForm({ ...wholesalerForm, targetRehabSpread: e.target.value })}
+                          placeholder="e.g. $25,000 - $60,000"
+                          className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0284C7]"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">Preferred Closing Timeline</span>
+                        <input
+                          type="text"
+                          value={wholesalerForm.preferredClosingTimeline}
+                          onChange={(e) => setWholesalerForm({ ...wholesalerForm, preferredClosingTimeline: e.target.value })}
+                          placeholder="e.g. 7-14 Days Cash"
+                          className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0284C7]"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">Proof of Funds</span>
+                        <select
+                          value={wholesalerForm.proofOfFundsStatus}
+                          onChange={(e) => setWholesalerForm({ ...wholesalerForm, proofOfFundsStatus: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0284C7]"
+                        >
+                          <option value="Verified on File">Verified on File</option>
+                          <option value="Pending Verification">Pending Verification</option>
+                          <option value="Requested">Requested</option>
+                          <option value="Not Provided">Not Provided</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleSaveWholesalerInfo}
+                          className="px-3 py-1 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setIsEditingWholesaler(false)}
+                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-[#475569] rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 text-[#475569]">
+                      <div className="flex items-center justify-between">
+                        <span>Target Rehab Spread:</span>
+                        <strong className="text-[#0B1F3A]">{currentContact.wholesalerInfo?.targetRehabSpread || '$25,000 - $60,000'}</strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Preferred Closing Timeline:</span>
+                        <strong className="text-[#0B1F3A]">{currentContact.wholesalerInfo?.preferredClosingTimeline || '7-14 Days Cash'}</strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Proof of Funds:</span>
+                        <span className="text-emerald-700 font-bold">{currentContact.wholesalerInfo?.proofOfFundsStatus || 'Verified on File'}</span>
+                      </div>
+                      {!isReadOnly && (
+                        <div className="pt-1 flex justify-end">
+                          <button
+                            onClick={() => {
+                              setWholesalerForm({
+                                targetRehabSpread: currentContact.wholesalerInfo?.targetRehabSpread || '$25,000 - $60,000',
+                                preferredClosingTimeline: currentContact.wholesalerInfo?.preferredClosingTimeline || '7-14 Days Cash',
+                                proofOfFundsStatus: currentContact.wholesalerInfo?.proofOfFundsStatus || 'Verified on File'
+                              });
+                              setIsEditingWholesaler(true);
+                            }}
+                            className="text-[11px] font-bold text-[#0284C7] hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit Wholesaler Info
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -680,10 +831,87 @@ export const ContactDetailPage: React.FC<ContactDetailPageProps> = ({
               </button>
 
               {expandedSections.contract && (
-                <div className="p-4 pt-1 space-y-2 border-t border-[#F1F5F9] text-xs text-[#475569]">
-                  <div>Buyer Entity: <strong>Momentum Capital Partners LLC</strong></div>
-                  <div>Title Company: <strong>Republic Title DFW</strong></div>
-                  <div>Standard Earnest Money: <strong>$2,500</strong></div>
+                <div className="p-4 pt-2 space-y-2.5 border-t border-[#F1F5F9] text-xs">
+                  {isEditingContract ? (
+                    <div className="space-y-2.5">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">Buyer Entity</span>
+                        <input
+                          type="text"
+                          value={contractForm.buyerEntity}
+                          onChange={(e) => setContractForm({ ...contractForm, buyerEntity: e.target.value })}
+                          placeholder="e.g. Momentum Capital Partners LLC"
+                          className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0284C7]"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">Title Company</span>
+                        <input
+                          type="text"
+                          value={contractForm.titleCompany}
+                          onChange={(e) => setContractForm({ ...contractForm, titleCompany: e.target.value })}
+                          placeholder="e.g. Republic Title DFW"
+                          className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0284C7]"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">Standard Earnest Money</span>
+                        <input
+                          type="text"
+                          value={contractForm.standardEarnestMoney}
+                          onChange={(e) => setContractForm({ ...contractForm, standardEarnestMoney: e.target.value })}
+                          placeholder="e.g. $2,500"
+                          className="w-full px-2.5 py-1.5 bg-[#F8FAFC] border border-[#CBD5E1] rounded-lg text-xs font-semibold focus:outline-none focus:border-[#0284C7]"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleSaveContractDefaults}
+                          className="px-3 py-1 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setIsEditingContract(false)}
+                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-[#475569] rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 text-[#475569]">
+                      <div className="flex items-center justify-between">
+                        <span>Buyer Entity:</span>
+                        <strong className="text-[#0B1F3A]">{currentContact.contractDefaults?.buyerEntity || 'Momentum Capital Partners LLC'}</strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Title Company:</span>
+                        <strong className="text-[#0B1F3A]">{currentContact.contractDefaults?.titleCompany || 'Republic Title DFW'}</strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Standard Earnest Money:</span>
+                        <strong className="text-[#0B1F3A]">{currentContact.contractDefaults?.standardEarnestMoney || '$2,500'}</strong>
+                      </div>
+                      {!isReadOnly && (
+                        <div className="pt-1 flex justify-end">
+                          <button
+                            onClick={() => {
+                              setContractForm({
+                                buyerEntity: currentContact.contractDefaults?.buyerEntity || 'Momentum Capital Partners LLC',
+                                titleCompany: currentContact.contractDefaults?.titleCompany || 'Republic Title DFW',
+                                standardEarnestMoney: currentContact.contractDefaults?.standardEarnestMoney || '$2,500'
+                              });
+                              setIsEditingContract(true);
+                            }}
+                            className="text-[11px] font-bold text-[#0284C7] hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit Contract Defaults
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1312,14 +1540,13 @@ export const ContactDetailPage: React.FC<ContactDetailPageProps> = ({
                     <span className="font-bold text-[#0B1F3A] block">Assigned Specialist</span>
                     <select
                       value={currentContact.ownerId || currentUser.id}
-                      onChange={(e) => {
-                        const u = users.find(usr => usr.id === e.target.value);
-                        if (u) updateContact(currentContact.id, { ownerId: u.id, ownerName: u.name });
-                      }}
-                      className="w-full p-2 bg-white border border-[#CBD5E1] rounded-lg font-bold text-xs"
+                      onChange={(e) => handleAssignSpecialist(e.target.value)}
+                      className="w-full p-2 bg-white border border-[#CBD5E1] rounded-lg font-bold text-xs focus:outline-none focus:border-[#0284C7] cursor-pointer"
                     >
-                      {users.map(u => (
-                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                      {availableUsersList.map((u: any) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || `${u.firstName} ${u.lastName}`} ({u.role})
+                        </option>
                       ))}
                     </select>
                   </div>
