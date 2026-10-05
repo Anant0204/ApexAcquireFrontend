@@ -522,29 +522,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           brokerage: matchingContact?.brokerage || 'Independent',
           latestMessage: text,
           timestamp: 'Just now',
-          grade: 'A',
-          score: 92,
-          temperature: 'Hot',
-          gradeReason: 'Active Inbound Lead with verified property criteria',
+          grade: 'B',
+          score: 75,
+          temperature: 'Warm',
+          gradeReason: 'Dialogue in progress with realtor',
           status: 'Interested',
-          outreachStage: 'Lead Created',
+          outreachStage: 'Outreach Sent',
           aiStatus: 'Active',
           unread: false,
           classification: 'Interested',
           messages: [userMsg],
-          propertyCaptured: {
-            address: '4812 Bordeaux Ave',
-            city: matchingContact?.market || 'Dallas',
-            state: 'TX',
-            zip: '75201',
-            askingPrice: 420000,
-            beds: 4,
-            baths: 2.5,
-            sqft: 2350,
-            condition: 'Needs cosmetic rehab (kitchen & flooring)',
-            timeline: '14-Day Fast Cash Close',
-            intent: 'High Motivation - Relocating Seller'
-          }
+          propertyCaptured: undefined
         };
         return [newConv, ...prev];
       }
@@ -564,76 +552,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     logAuditAction(`Sent outbound message: "${text.substring(0, 30)}..."`, `Conversation #${conversationId}`);
 
-    // 🤖 Smart Automated Realtor Response Simulator for Testing
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      let replyText = '';
-      let shouldExtract = false;
-      let askingPrice = 420000;
-      let address = '4812 Bordeaux Ave, Dallas, TX 75201';
 
-      if (lower.includes('property') || lower.includes('deal') || lower.includes('criteria') || lower.includes('looking for') || lower.includes('have') || lower.includes('hi') || lower.includes('hello')) {
-        replyText = "Hi! Yes, I represent a motivated seller with an off-market 4-bed, 2.5-bath property at 4812 Bordeaux Ave, Dallas, TX 75201 (2,350 sqft). Asking $420,000. Needs light cosmetic updates (~$40k). Seller wants a 14-day cash close.";
-        shouldExtract = true;
-      } else if (lower.includes('price') || lower.includes('offer') || lower.includes('cash') || lower.includes('$') || lower.includes('loi')) {
-        replyText = "Thanks for the numbers! The seller reviewed your cash terms with zero contingencies. They are ready to execute the purchase agreement if we can close by next Friday.";
-        shouldExtract = true;
-      } else if (lower.includes('photo') || lower.includes('walk') || lower.includes('access') || lower.includes('inspect')) {
-        replyText = "Lockbox code on site is 4829. Feel free to have your acquisitions inspector walk the property tomorrow between 10 AM and 4 PM.";
-      } else {
-        replyText = "Understood! I am sending over the title info and seller disclosure documents for your underwriting review.";
-      }
-
-      const simMsg = {
-        id: `msg-sim-${Date.now()}`,
-        sender: 'realtor' as const,
-        text: replyText,
-        timestamp: 'Just now',
-        channel: 'sms' as const
-      };
-
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === conversationId) {
-          const currentCaptured = conv.propertyCaptured || {
-            address,
-            city: 'Dallas',
-            state: 'TX',
-            zip: '75201',
-            askingPrice,
-            beds: 4,
-            baths: 2.5,
-            sqft: 2350,
-            condition: 'Needs cosmetic rehab (kitchen & flooring)',
-            timeline: '14-Day Fast Cash Close',
-            intent: 'High Motivation - Relocating Seller'
-          };
-
-          const updatedCaptured = shouldExtract ? {
-            ...currentCaptured,
-            address,
-            askingPrice,
-            condition: 'Needs cosmetic rehab (kitchen & flooring)',
-            timeline: '14-Day Fast Cash Close',
-            intent: 'High Motivation - Relocating Seller'
-          } : currentCaptured;
-
-          return {
-            ...conv,
-            latestMessage: replyText,
-            timestamp: 'Just now',
-            status: shouldExtract ? 'Leads With Address' : conv.status,
-            outreachStage: shouldExtract ? 'Lead Created' : conv.outreachStage,
-            temperature: 'Hot',
-            grade: 'A',
-            score: 95,
-            gradeReason: 'AI Simulator: Motivated seller verified with extracted asking price and fast timeline.',
-            propertyCaptured: updatedCaptured,
-            messages: [...conv.messages, simMsg]
-          };
-        }
-        return conv;
-      }));
-    }, 1200);
   };
 
   const toggleAiTakeover = (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
