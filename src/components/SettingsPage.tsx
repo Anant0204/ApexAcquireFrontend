@@ -6,7 +6,7 @@ import { Save, Bot, Sliders, Shield, Users, Check, UserPlus, X } from 'lucide-re
 import { IntegrationSettingsTab } from './IntegrationSettingsTab';
 
 export const SettingsPage: React.FC = () => {
-  const { settings, updateSettings, users, addUser, toggleUserStatus, currentUser } = useApp();
+  const { settings, updateSettings, users, addUser, toggleUserStatus, currentUser, hasPermission } = useApp();
   
   const isAdmin = currentUser.role === 'ADMIN';
   const isManager = currentUser.role === 'MANAGER';
@@ -69,6 +69,104 @@ export const SettingsPage: React.FC = () => {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<any | null>(null);
+  
+  // Role Permissions Modal State
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [permissionsUser, setPermissionsUser] = useState<any | null>(null);
+  const [localPermissions, setLocalPermissions] = useState<Record<string, Record<string, boolean>>>({});
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+
+  const openPermissionsModal = (user: any) => {
+    setPermissionsUser(user);
+    if (user.permissions) {
+      setLocalPermissions(user.permissions);
+    } else {
+      // Default fallback if no permissions exist yet in DB
+      const defaults: Record<string, Record<string, boolean>> = {};
+      
+      const role = user.role;
+      const agentAllowed = ['Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 'Conversations', 'Task Manager', 'Contacts Directory', 'Marketing', 'Templates & Automations'];
+      const readOnlyAllowed = ['Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 'Conversations', 'Contacts Directory', 'Marketing', 'Reports & Audit'];
+
+      [
+        'Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 
+        'Conversations', 'Task Manager', 'Contacts Directory', 'Marketing', 
+        'Templates & Automations', 'Reports & Audit', 'Settings'
+      ].forEach(mod => {
+        
+        let showAndView = false;
+        let canEdit = false;
+        let canCreate = false;
+        let canDelete = false;
+        
+        if (role === 'ADMIN' || role === 'MANAGER') {
+          showAndView = true;
+          canEdit = true;
+          canCreate = true;
+          canDelete = role === 'ADMIN';
+        } else if (role === 'AGENT') {
+          showAndView = agentAllowed.includes(mod);
+          canEdit = agentAllowed.includes(mod);
+          canCreate = agentAllowed.includes(mod);
+        } else if (role === 'READ_ONLY') {
+          showAndView = readOnlyAllowed.includes(mod);
+        }
+
+        defaults[mod] = {
+          'Show': showAndView, 
+          'View': showAndView, 
+          'Export': role === 'ADMIN',
+          'Manage': canEdit, 
+          'Create': canCreate,
+          'Edit': canEdit,
+          'Delete': canDelete
+        };
+      });
+      setLocalPermissions(defaults);
+    }
+    setShowPermissionsModal(true);
+  };
+
+  const handlePermissionChange = (module: string, perm: string, checked: boolean) => {
+    setLocalPermissions(prev => ({
+      ...prev,
+      [module]: {
+        ...(prev[module] || {}),
+        [perm]: checked
+      }
+    }));
+  };
+
+  const handleSavePermissions = async () => {
+    if (!permissionsUser) return;
+    setIsSavingPermissions(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_BASE_URL}/users/${permissionsUser.id}`, {
+        method: 'PUT',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          permissions: localPermissions
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local list
+        setApiUsers(prev => prev.map(u => u.id === permissionsUser.id ? { ...u, permissions: localPermissions } : u));
+        setShowPermissionsModal(false);
+      } else {
+        alert("Failed to save permissions: " + (data.error?.message || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend");
+    } finally {
+      setIsSavingPermissions(false);
+    }
+  };
   
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -270,24 +368,33 @@ export const SettingsPage: React.FC = () => {
         <IntegrationSettingsTab />
       )}
 
-      {/* TAB: USER MANAGEMENT (ADMIN ONLY - MANAGER CANNOT SEE THIS TAB AT ALL) */}
-      {safeActiveTab === 'users' && isAdmin && (
+      {/* TAB: USER MANAGEMENT (ADMIN ONLY or Users with View Permissions) */}
+      {safeActiveTab === 'users' && (isAdmin || hasPermission('Settings', 'View')) && (
         <div className="executive-panel rounded-2xl p-6 space-y-4 shadow-sm border border-[#E2E8F0]">
           <div className="flex justify-between items-center pb-2 border-b border-[#E2E8F0]">
             <h3 className="text-xs font-bold text-[#0B1F3A] uppercase tracking-wider">Active System Users ({apiUsers.length})</h3>
-            <button
-              onClick={openAddModal}
-              className="px-3.5 py-1.5 btn-executive-primary text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-            >
-              <UserPlus className="w-3.5 h-3.5" /> Add User
-            </button>
+            {(isAdmin || hasPermission('Settings', 'Create') || hasPermission('Settings', 'Manage')) && (
+              <button
+                onClick={openAddModal}
+                className="px-3.5 py-1.5 btn-executive-primary text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Add User
+              </button>
+            )}
           </div>
 
           <div className="space-y-3">
             {apiUsers.map((u) => (
               <div key={u.id} className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-between text-xs shadow-sm">
                 <div>
-                  <div className="font-bold text-[#0F172A] flex items-center gap-2">
+                  <div 
+                    className={`font-bold text-[#0F172A] flex items-center gap-2 ${isAdmin || hasPermission('Settings', 'Manage') ? 'cursor-pointer hover:text-[#155EEF] transition-colors' : ''}`}
+                    onClick={() => {
+                      if (isAdmin || hasPermission('Settings', 'Manage')) {
+                        openPermissionsModal(u);
+                      }
+                    }}
+                  >
                     {u.firstName} {u.lastName}
                     <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#EAF2FF] text-[#155EEF] border border-[#155EEF]/20">
                       {u.role}
@@ -298,26 +405,32 @@ export const SettingsPage: React.FC = () => {
 
                 {u.id !== currentUser.id && (
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => openEditModal(u)}
-                      className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
-                    >
-                      Edit User
-                    </button>
-                    <button
-                      onClick={() => handleToggleUserStatus(u.id, u.status)}
-                      className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
-                        u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {u.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                    <button
-                      onClick={() => setUserToDelete(u)}
-                      className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-red-600 hover:bg-red-200 transition-colors cursor-pointer"
-                    >
-                      Delete
-                    </button>
+                    {(isAdmin || hasPermission('Settings', 'Edit')) && (
+                      <>
+                        <button
+                          onClick={() => openEditModal(u)}
+                          className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                        >
+                          Edit User
+                        </button>
+                        <button
+                          onClick={() => handleToggleUserStatus(u.id, u.status)}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                            u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {u.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      </>
+                    )}
+                    {(isAdmin || hasPermission('Settings', 'Delete')) && (
+                      <button
+                        onClick={() => setUserToDelete(u)}
+                        className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-red-600 hover:bg-red-200 transition-colors cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -574,6 +687,111 @@ export const SettingsPage: React.FC = () => {
                 Yes, Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ROLE PERMISSIONS MODAL (PHASE 1) */}
+      {showPermissionsModal && permissionsUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-xl relative shadow-2xl border border-[#E2E8F0] flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between bg-[#F8FBFF] rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-[#155EEF]" />
+                <h3 className="text-sm font-bold text-[#0B1F3A]">Edit Role Permissions</h3>
+              </div>
+              <button onClick={() => setShowPermissionsModal(false)} className="text-[#64748B] hover:text-[#0F172A] cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-6">
+                <label className="block text-[10px] font-bold text-[#475569] uppercase tracking-wider mb-2">
+                  Role Name <span className="text-red-500">*</span>
+                </label>
+                <div className="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-sm font-bold text-[#0F172A]">
+                  {permissionsUser.role} ({permissionsUser.firstName} {permissionsUser.lastName})
+                </div>
+              </div>
+
+              <label className="block text-[10px] font-bold text-[#475569] uppercase tracking-wider mb-3">
+                Assign Permission to Roles
+              </label>
+
+              <div className="border border-[#E2E8F0] rounded-lg overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#F8FBFF] border-b border-[#E2E8F0]">
+                      <th className="py-3 px-4 text-[10px] font-bold text-[#475569] uppercase tracking-wider w-1/3">Module</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-[#475569] uppercase tracking-wider">Permissions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2E8F0] text-xs">
+                    {[
+                      { name: 'Dashboard', perms: ['Show', 'View', 'Export'] },
+                      { name: 'Outreach Pipeline', perms: ['Show', 'View', 'Manage', 'Edit'] },
+                      { name: 'AI Deals & Offers', perms: ['Show', 'View', 'Manage', 'Create', 'Edit', 'Delete'] },
+                      { name: 'Conversations', perms: ['Show', 'View', 'Manage', 'Create', 'Edit', 'Delete'] },
+                      { name: 'Task Manager', perms: ['Show', 'View', 'Manage', 'Create', 'Edit', 'Delete'] },
+                      { name: 'Contacts Directory', perms: ['Show', 'View', 'Manage', 'Create', 'Edit', 'Delete'] },
+                      { name: 'Marketing', perms: ['Show', 'View', 'Manage', 'Create', 'Edit', 'Delete'] },
+                      { name: 'Templates & Automations', perms: ['Show', 'View', 'Manage', 'Create', 'Edit', 'Delete'] },
+                      { name: 'Reports & Audit', perms: ['Show', 'View', 'Export'] },
+                      { name: 'Settings', perms: ['Show', 'View', 'Manage', 'Edit'] }
+                    ].filter(mod => {
+                      if (permissionsUser?.role === 'READ_ONLY') {
+                        return ['Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 'Conversations', 'Contacts Directory', 'Marketing', 'Reports & Audit'].includes(mod.name);
+                      }
+                      if (permissionsUser?.role === 'AGENT') {
+                        return ['Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 'Conversations', 'Task Manager', 'Contacts Directory', 'Marketing', 'Templates & Automations'].includes(mod.name);
+                      }
+                      return true; // ADMIN and MANAGER see all 10
+                    }).map((mod, idx) => (
+                      <tr key={idx} className="hover:bg-[#F8FAFC]/50 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-[#0F172A] border-r border-[#E2E8F0]/50">{mod.name}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-wrap gap-x-6 gap-y-2">
+                            {mod.perms.map((p, i) => (
+                              <label key={i} className="flex items-center gap-2 cursor-pointer group">
+                                <input 
+                                  type="checkbox" 
+                                  checked={!!(localPermissions[mod.name]?.[p])}
+                                  onChange={(e) => handlePermissionChange(mod.name, p, e.target.checked)}
+                                  className="w-4 h-4 rounded border-[#CBD5E1] text-[#155EEF] focus:ring-[#155EEF] cursor-pointer"
+                                />
+                                <span className="text-[#475569] font-medium group-hover:text-[#0F172A] transition-colors">{p}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-[#E2E8F0] flex items-center justify-end gap-3 bg-white rounded-b-xl">
+              <button
+                onClick={() => setShowPermissionsModal(false)}
+                className="px-6 py-2.5 rounded-lg text-xs font-bold text-[#475569] border border-[#E2E8F0] hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSavePermissions}
+                disabled={isSavingPermissions}
+                className="px-6 py-2.5 rounded-lg text-xs font-bold text-[#0F172A] bg-[#FFD100] hover:bg-[#FACC15] shadow-sm transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSavingPermissions ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+
           </div>
         </div>
       )}

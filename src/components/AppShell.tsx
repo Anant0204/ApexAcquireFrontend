@@ -33,7 +33,7 @@ interface ShellProps {
 }
 
 export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveTab, onOpenTutorial }) => {
-  const { currentUser, setCurrentUserRole, logout, notifications, markNotificationRead, tasks } = useApp();
+  const { currentUser, setCurrentUserRole, logout, notifications, markNotificationRead, tasks, hasPermission } = useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -104,7 +104,21 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['ADMIN', 'MANAGER'] },
   ];
 
-  const visibleNavItems = allNavItems.filter(item => item.roles.includes(currentUser.role));
+  const visibleNavItems = allNavItems.filter(item => {
+    // Check custom permissions for each tab
+    if (item.id === 'dashboard') return hasPermission('Dashboard', 'Show');
+    if (item.id === 'outreach') return hasPermission('Outreach Pipeline', 'Show');
+    if (item.id === 'contacts') return hasPermission('Contacts Directory', 'View') || hasPermission('Contacts Directory', 'Show');
+    if (item.id === 'deals') return hasPermission('AI Deals & Offers', 'View') || hasPermission('AI Deals & Offers', 'Show');
+    if (item.id === 'conversations') return hasPermission('Conversations', 'View') || hasPermission('Conversations', 'Show');
+    if (item.id === 'tasks') return hasPermission('Task Manager', 'View') || hasPermission('Task Manager', 'Show');
+    if (item.id === 'marketing') return hasPermission('Marketing', 'View') || hasPermission('Marketing', 'Show');
+    if (item.id === 'templates') return hasPermission('Templates & Automations', 'View') || hasPermission('Templates & Automations', 'Show');
+    if (item.id === 'reports') return hasPermission('Reports & Audit', 'Show') || hasPermission('Reports & Audit', 'View');
+    if (item.id === 'settings') return hasPermission('Settings', 'View') || hasPermission('Settings', 'Show') || hasPermission('Settings', 'Manage');
+    
+    return true;
+  });
 
   const handleNavClick = (id: string) => {
     setActiveTab(id);

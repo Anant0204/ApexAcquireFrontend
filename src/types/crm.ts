@@ -8,6 +8,7 @@ export interface UserProfile {
   avatar: string;
   title: string;
   status: 'Active' | 'Deactivated';
+  permissions?: Record<string, Record<string, boolean>>;
 }
 
 export type OutreachStage = 

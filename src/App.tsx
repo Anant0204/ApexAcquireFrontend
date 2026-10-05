@@ -22,7 +22,7 @@ import type { RealtorContact, PropertyDeal } from './types/crm';
 import './App.css';
 
 const App: React.FC = () => {
-  const { isAuthenticated, setActiveConversationId, currentUser, deals } = useApp();
+  const { isAuthenticated, setActiveConversationId, currentUser, deals, hasPermission } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,16 +40,23 @@ const App: React.FC = () => {
   }, [isAuthenticated, location.pathname, navigate]);
 
   // Navigation Access Matrix across roles
-  const allowedTabs: Record<string, string[]> = {
-    ADMIN: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'],
-    MANAGER: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'],
-    AGENT: ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates'],
-    READ_ONLY: ['dashboard', 'outreach', 'deals', 'conversations', 'contacts', 'marketing', 'reports']
-  };
-
   const userRole = currentUser?.role || 'READ_ONLY';
   const rolePath = userRole.toLowerCase().replace('_', '-');
-  const userAllowedTabs = allowedTabs[userRole] || ['dashboard'];
+  const baseAllowedTabs = ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'];
+  const userAllowedTabs = baseAllowedTabs.filter(tab => {
+    if (tab === 'dashboard') return hasPermission('Dashboard', 'Show');
+    if (tab === 'outreach') return hasPermission('Outreach Pipeline', 'Show');
+    if (tab === 'contacts') return hasPermission('Contacts Directory', 'View') || hasPermission('Contacts Directory', 'Show');
+    if (tab === 'deals') return hasPermission('AI Deals & Offers', 'View') || hasPermission('AI Deals & Offers', 'Show');
+    if (tab === 'conversations') return hasPermission('Conversations', 'View') || hasPermission('Conversations', 'Show');
+    if (tab === 'tasks') return hasPermission('Task Manager', 'View') || hasPermission('Task Manager', 'Show');
+    if (tab === 'marketing') return hasPermission('Marketing', 'View') || hasPermission('Marketing', 'Show');
+    if (tab === 'templates') return hasPermission('Templates & Automations', 'View') || hasPermission('Templates & Automations', 'Show');
+    if (tab === 'reports') return hasPermission('Reports & Audit', 'Show') || hasPermission('Reports & Audit', 'View');
+    if (tab === 'settings') return hasPermission('Settings', 'View') || hasPermission('Settings', 'Show') || hasPermission('Settings', 'Manage');
+    
+    return true;
+  });
 
   // Map path to active tab (e.g., /admin/dashboard -> dashboard)
   const pathParts = location.pathname.split('/');
