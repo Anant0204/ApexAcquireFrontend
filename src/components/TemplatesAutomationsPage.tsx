@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import type { EmailTemplate, WorkflowRule, AIPersonalityConfig } from '../types/crm';
@@ -64,8 +65,8 @@ export const TemplatesAutomationsPage: React.FC = () => {
         const headers = { Authorization: `Bearer ${token}` };
         
         const [tplRes, setRes] = await Promise.all([
-          fetch('http://localhost:5000/api/v1/templates', { headers }),
-          fetch('http://localhost:5000/api/v1/settings', { headers })
+          fetch(`${API_BASE_URL}/templates`, { headers }),
+          fetch(`${API_BASE_URL}/settings`, { headers })
         ]);
         
         const tplJson = await tplRes.json();
@@ -125,7 +126,7 @@ export const TemplatesAutomationsPage: React.FC = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch('http://localhost:5000/api/v1/settings', {
+      await fetch(`${API_BASE_URL}/settings`, {
         method: 'PUT',
         headers: { 
           Authorization: `Bearer ${token}`,

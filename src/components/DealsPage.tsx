@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { PropertyDeal, DealStage, ContactTemperature } from '../types/crm';
@@ -240,7 +241,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     const fetchDeals = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/deals/pipeline', {
+        const res = await fetch(`${API_BASE_URL}/deals/pipeline`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -286,7 +287,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     const fetchContacts = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/contacts', {
+        const res = await fetch(`${API_BASE_URL}/contacts`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -358,7 +359,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/deals/${dealId}/stage`, {
+      await fetch(`${API_BASE_URL}/deals/${dealId}/stage`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -413,7 +414,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
         grade: 'B'
       };
 
-      const res = await fetch('http://localhost:5000/api/v1/deals', {
+      const res = await fetch(`${API_BASE_URL}/deals`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { PropertyDeal, RealtorContact, DealStage, ContactTemperature } from '../types/crm';
@@ -163,7 +164,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
 
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/deals/${deal.id}/assign`, {
+      await fetch(`${API_BASE_URL}/deals/${deal.id}/assign`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -266,7 +267,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
 
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/deals/${deal.id}/analysis`, {
+      await fetch(`${API_BASE_URL}/deals/${deal.id}/analysis`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 
@@ -10,7 +11,7 @@ export const ReportsPage: React.FC = () => {
     const fetchReports = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/reports', {
+        const res = await fetch(`${API_BASE_URL}/reports`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();

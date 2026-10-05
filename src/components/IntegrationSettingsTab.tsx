@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useEffect, useState } from 'react';
 import { Shield, RefreshCw } from 'lucide-react';
 
@@ -9,7 +10,7 @@ export const IntegrationSettingsTab: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/integrations', {
+      const res = await fetch(`${API_BASE_URL}/integrations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -30,7 +31,7 @@ export const IntegrationSettingsTab: React.FC = () => {
   const handleConnect = async (type: string, name: string) => {
     const fakeSecrets = { test: '123' }; // In real UI, open a modal to enter secrets
     const token = localStorage.getItem('accessToken');
-    await fetch('http://localhost:5000/api/v1/integrations', {
+    await fetch(`${API_BASE_URL}/integrations`, {
       method: 'POST',
       headers: { 
         Authorization: `Bearer ${token}`,
@@ -43,7 +44,7 @@ export const IntegrationSettingsTab: React.FC = () => {
 
   const handleTest = async (id: string) => {
     const token = localStorage.getItem('accessToken');
-    await fetch(`http://localhost:5000/api/v1/integrations/${id}/test`, {
+    await fetch(`${API_BASE_URL}/integrations/${id}/test`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     });

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { RealtorContact, OutreachStage, ContactTemperature, Grade } from '../types/crm';
@@ -106,7 +107,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
   const fetchContacts = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/contacts', {
+      const res = await fetch(`${API_BASE_URL}/contacts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -242,7 +243,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     setImportingCsv(true);
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/contacts/bulk', {
+      const res = await fetch(`${API_BASE_URL}/contacts/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +304,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     const token = localStorage.getItem('accessToken');
     try {
       if (editingContact) {
-        const res = await fetch(`http://localhost:5000/api/v1/contacts/${editingContact.id}`, {
+        const res = await fetch(`${API_BASE_URL}/contacts/${editingContact.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -318,7 +319,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
         }
         setEditingContact(null);
       } else {
-        const res = await fetch('http://localhost:5000/api/v1/contacts', {
+        const res = await fetch(`${API_BASE_URL}/contacts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -351,7 +352,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     updateContactTemperature(id, temp);
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/contacts/${id}`, {
+      await fetch(`${API_BASE_URL}/contacts/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -369,7 +370,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     archiveContact(id);
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/contacts/${id}`, {
+      await fetch(`${API_BASE_URL}/contacts/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

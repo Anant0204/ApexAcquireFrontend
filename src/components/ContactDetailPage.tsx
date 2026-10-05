@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useEffect } from 'react';
 import type { RealtorContact, ContactTemperature, OutreachStage, DealStage, Grade } from '../types/crm';
 import { useApp } from '../context/AppContext';
@@ -93,7 +94,7 @@ export const ContactDetailPage: React.FC<ContactDetailPageProps> = ({
     const fetchUsersList = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/users', {
+        const res = await fetch(`${API_BASE_URL}/users`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();

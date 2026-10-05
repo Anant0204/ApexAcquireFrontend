@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Conversation, Grade, ContactTemperature } from '../types/crm';
@@ -62,7 +63,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
     const fetchConversations = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/conversations', {
+        const res = await fetch(`${API_BASE_URL}/conversations`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();

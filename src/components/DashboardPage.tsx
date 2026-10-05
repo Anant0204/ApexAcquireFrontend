@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { 
@@ -30,7 +31,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({ onNavigate }) => {
     const fetchDashboard = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/dashboard/metrics', {
+        const res = await fetch(`${API_BASE_URL}/dashboard/metrics`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();

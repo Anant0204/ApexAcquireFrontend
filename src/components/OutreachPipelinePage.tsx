@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { RealtorContact, OutreachStage, ContactTemperature } from '../types/crm';
@@ -164,7 +165,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
     const fetchPipeline = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('http://localhost:5000/api/v1/outreach/pipeline', {
+        const res = await fetch(`${API_BASE_URL}/outreach/pipeline`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -218,7 +219,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
     // 3. Persist to Backend MySQL Database
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/contacts/${contactId}`, {
+      await fetch(`${API_BASE_URL}/contacts/${contactId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -247,7 +248,7 @@ export const OutreachPipelinePage: React.FC<OutreachPipelineProps> = ({ onSelect
 
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/contacts/${contactId}`, {
+      await fetch(`${API_BASE_URL}/contacts/${contactId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

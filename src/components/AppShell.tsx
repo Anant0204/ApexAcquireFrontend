@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/crm';
@@ -64,8 +65,8 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
         const token = localStorage.getItem('accessToken');
         if (!token) return;
         const [dealsRes, convsRes] = await Promise.all([
-          fetch('http://localhost:5000/api/v1/deals/pipeline', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('http://localhost:5000/api/v1/conversations', { headers: { Authorization: `Bearer ${token}` } })
+          fetch(`${API_BASE_URL}/deals/pipeline`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/conversations`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
         const dealsJson = await dealsRes.json();
         if (dealsJson.success && Array.isArray(dealsJson.data)) {

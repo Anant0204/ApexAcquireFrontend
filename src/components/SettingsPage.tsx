@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/crm';
@@ -39,8 +40,8 @@ export const SettingsPage: React.FC = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
         const [setRes, usrRes] = await Promise.all([
-          fetch('http://localhost:5000/api/v1/settings', { headers }),
-          fetch('http://localhost:5000/api/v1/users', { headers })
+          fetch(`${API_BASE_URL}/settings`, { headers }),
+          fetch(`${API_BASE_URL}/users`, { headers })
         ]);
 
         const setJson = await setRes.json();
@@ -76,7 +77,7 @@ export const SettingsPage: React.FC = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch('http://localhost:5000/api/v1/settings', {
+      await fetch(`${API_BASE_URL}/settings`, {
         method: 'PUT',
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -99,7 +100,7 @@ export const SettingsPage: React.FC = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/users', {
+      const res = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -134,7 +135,7 @@ export const SettingsPage: React.FC = () => {
       const token = localStorage.getItem('accessToken');
       
       // Note: Endpoint for updating user status should exist, but fallback to updating local API state for UI responsiveness
-      const res = await fetch(`http://localhost:5000/api/v1/users/${userId}/role`, {
+      const res = await fetch(`${API_BASE_URL}/users/${userId}/role`, {
         method: 'PATCH',
         headers: { 
           Authorization: `Bearer ${token}`,

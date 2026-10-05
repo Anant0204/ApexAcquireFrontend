@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
@@ -81,7 +82,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/tasks', {
+      const res = await fetch(`${API_BASE_URL}/tasks`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -119,7 +120,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/users', {
+      const res = await fetch(`${API_BASE_URL}/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -137,7 +138,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   const fetchContacts = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/contacts', {
+      const res = await fetch(`${API_BASE_URL}/contacts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -199,7 +200,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
       
       if (editingTaskId) {
         // Update existing task
-        await fetch(`http://localhost:5000/api/v1/tasks/${editingTaskId}`, {
+        await fetch(`${API_BASE_URL}/tasks/${editingTaskId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -246,7 +247,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
           dueDate: formattedDue
         };
 
-        const res = await fetch('http://localhost:5000/api/v1/tasks', {
+        const res = await fetch(`${API_BASE_URL}/tasks`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -307,7 +308,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
 
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/tasks/${taskId}`, {
+      await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -326,7 +327,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     setApiTasks(prev => prev.filter(t => t.id !== taskId));
     try {
       const token = localStorage.getItem('accessToken');
-      await fetch(`http://localhost:5000/api/v1/tasks/${taskId}`, {
+      await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

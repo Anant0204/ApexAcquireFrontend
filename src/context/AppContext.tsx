@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { 
   UserProfile, 
@@ -201,7 +202,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
-        const res = await fetch('http://localhost:5000/api/v1/users', {
+        const res = await fetch(`${API_BASE_URL}/users`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -257,7 +258,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const login = async (email: string, role: UserRole = 'ADMIN') => {
     try {
       // In a real app we'd get password from the form, for demo we hardcode the seed password
-      const res = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: 'password123' })
@@ -340,7 +341,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const token = localStorage.getItem('accessToken');
     if (token) {
-      fetch(`http://localhost:5000/api/v1/contacts/${id}`, {
+      fetch(`${API_BASE_URL}/contacts/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -710,7 +711,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const token = localStorage.getItem('accessToken');
     if (token) {
-      fetch(`http://localhost:5000/api/v1/deals/${dealId}/assign`, {
+      fetch(`${API_BASE_URL}/deals/${dealId}/assign`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -823,7 +824,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const token = localStorage.getItem('accessToken');
       if (token && !dealId.startsWith('dl-')) {
-        await fetch(`http://localhost:5000/api/v1/deals/${dealId}`, {
+        await fetch(`${API_BASE_URL}/deals/${dealId}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` }
         });

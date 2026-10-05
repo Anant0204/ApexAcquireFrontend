@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config/api';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
@@ -104,8 +105,8 @@ export const MarketingPage: React.FC = () => {
       try {
         const token = localStorage.getItem('accessToken');
         const [socialRes, intRes] = await Promise.all([
-          fetch('http://localhost:5000/api/v1/marketing/social', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:5000/api/v1/integrations', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch(`${API_BASE_URL}/marketing/social`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/integrations`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
         
         const socialJson = await socialRes.json();
@@ -234,7 +235,7 @@ export const MarketingPage: React.FC = () => {
     try {
       const token = localStorage.getItem('accessToken');
       const payload = socialCredentials[channel] as any;
-      const res = await fetch(`http://localhost:5000/api/v1/marketing/social/${channel.toUpperCase()}`, {
+      const res = await fetch(`${API_BASE_URL}/marketing/social/${channel.toUpperCase()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +284,7 @@ export const MarketingPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/marketing/post', {
+      const res = await fetch(`${API_BASE_URL}/marketing/post`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -312,7 +313,7 @@ export const MarketingPage: React.FC = () => {
   const handleDispatchBlast = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/marketing/blast', {
+      const res = await fetch(`${API_BASE_URL}/marketing/blast`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -348,7 +349,7 @@ export const MarketingPage: React.FC = () => {
   const saveIntegration = async (type: string, name: string, secrets: any, config: any, onSuccess: () => void) => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('http://localhost:5000/api/v1/integrations', {
+      const res = await fetch(`${API_BASE_URL}/integrations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ type, name, secrets, config })
