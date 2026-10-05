@@ -197,7 +197,7 @@ export const getStageConfig = (stage: string): StageVisualConfig => {
 };
 
 export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
-  const { deals, addDeal, updateDealStage, archiveDeal, contacts, users, currentUser } = useApp();
+  const { deals, addDeal, updateDealStage, archiveDeal, deleteDeal, bulkDeleteDeals, contacts, users, currentUser } = useApp();
 
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [selectedView, setSelectedView] = useState<'ALL' | 'SORT_ACTIVITY' | 'NEED_MANAGER_ARV' | 'UNDER_CONTRACT' | 'CLOSED_FUNDED'>('ALL');
@@ -210,6 +210,64 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
   // Modals state
   const [showAddDealModal, setShowAddDealModal] = useState(false);
   const [archivingDealId, setArchivingDealId] = useState<string | null>(null);
+  // Delete confirmation modal state
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'bulk';
+    dealId?: string;
+    dealAddress?: string;
+    count?: number;
+  }>({ isOpen: false, type: 'single' });
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleOpenDeleteSingle = (dealId: string, address: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDeleteModalState({
+      isOpen: true,
+      type: 'single',
+      dealId,
+      dealAddress: address
+    });
+  };
+
+  const handleOpenDeleteBulk = () => {
+    if (selectedDealIds.length === 0) return;
+    setDeleteModalState({
+      isOpen: true,
+      type: 'bulk',
+      count: selectedDealIds.length
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      if (deleteModalState.type === 'single' && deleteModalState.dealId) {
+        const id = deleteModalState.dealId;
+        setApiDeals(prev => prev.filter(d => d.id !== id));
+        setSelectedDealIds(prev => prev.filter(i => i !== id));
+        if (deleteDeal) {
+          await deleteDeal(id);
+        } else {
+          await archiveDeal(id);
+        }
+      } else if (deleteModalState.type === 'bulk') {
+        const idsToDelete = [...selectedDealIds];
+        setApiDeals(prev => prev.filter(d => !idsToDelete.includes(d.id)));
+        setSelectedDealIds([]);
+        if (bulkDeleteDeals) {
+          await bulkDeleteDeals(idsToDelete);
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting deal(s):', err);
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalState({ isOpen: false, type: 'single' });
+    }
+  };
+
 
   const [newDeal, setNewDeal] = useState({
     address: '',
@@ -301,7 +359,24 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     fetchContacts();
   }, [deals, currentUser]);
 
-  const activeDeals = apiDeals.filter(d => !d.isArchived);
+  const combinedDeals = React.useMemo(() => {
+    const dealsMap = new Map();
+    // 1. Add context deals
+    if (Array.isArray(deals)) {
+      deals.forEach(d => {
+        if (d && d.id) dealsMap.set(d.id, { ...d, stage: normalizeDealStage(d.stage) });
+      });
+    }
+    // 2. Merge apiDeals from backend
+    if (Array.isArray(apiDeals)) {
+      apiDeals.forEach(d => {
+        if (d && d.id) dealsMap.set(d.id, { ...d, stage: normalizeDealStage(d.stage) });
+      });
+    }
+    return Array.from(dealsMap.values());
+  }, [deals, apiDeals]);
+
+  const activeDeals = combinedDeals.filter(d => !d.isArchived);
 
   // Filter deals based on view, owner, and search
   const filteredDeals = activeDeals.filter((d) => {
@@ -783,6 +858,17 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
           {/* Right: Reports & Add Deal Button */}
           <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
             
+            {selectedDealIds.length > 0 && !isReadOnly && (
+              <button
+                onClick={handleOpenDeleteBulk}
+                className="px-3.5 py-1.5 bg-[#E11D48] hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer animate-fadeIn"
+                title="Delete selected deals"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected ({selectedDealIds.length})</span>
+              </button>
+            )}
+
             <div className="relative">
               <button className="px-3 py-1.5 bg-white border border-[#CBD5E1] rounded-xl text-xs font-semibold text-[#475569] hover:bg-[#F8FAFC] flex items-center gap-1.5 cursor-pointer">
                 <span>Reports Create report</span>
@@ -806,6 +892,32 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
         {/* 3. TABLE VIEW (Screenshot 1 Exact Replica) */}
         {viewMode === 'table' && (
           <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-xs overflow-hidden">
+            {/* Multi-Select Action Banner */}
+            {selectedDealIds.length > 0 && (
+              <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between animate-fadeIn">
+                <div className="flex items-center gap-2 text-xs text-rose-800 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping"></span>
+                  <span><strong>{selectedDealIds.length}</strong> deal{selectedDealIds.length > 1 ? 's' : ''} selected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedDealIds([])}
+                    className="px-2.5 py-1 rounded-lg text-xs text-[#64748B] hover:text-[#0B1F3A] hover:bg-rose-100 font-medium cursor-pointer"
+                  >
+                    Deselect All
+                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={handleOpenDeleteBulk}
+                      className="px-3 py-1 rounded-lg bg-[#E11D48] hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Selected ({selectedDealIds.length})</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -967,12 +1079,23 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
 
                           {/* Action */}
                           <td className="py-3.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => onSelectDeal(deal)}
-                              className="px-3 py-1 bg-[#155EEF] hover:bg-[#1048B5] text-white text-xs font-bold rounded-lg transition-all shadow-xs cursor-pointer inline-flex items-center gap-1"
-                            >
-                              Open &gt;
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => onSelectDeal(deal)}
+                                className="px-3 py-1 bg-[#155EEF] hover:bg-[#1048B5] text-white text-xs font-bold rounded-lg transition-all shadow-xs cursor-pointer inline-flex items-center gap-1"
+                              >
+                                Open &gt;
+                              </button>
+                              {!isReadOnly && (
+                                <button
+                                  onClick={(e) => handleOpenDeleteSingle(deal.id, deal.address, e)}
+                                  className="p-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50 hover:border-rose-300 transition-colors cursor-pointer"
+                                  title="Delete Deal"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1062,8 +1185,19 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-[#E2E8F0] pl-1.5 text-[10px] text-[#64748B]">
-                          <span className="font-medium truncate max-w-[120px]">{deal.realtorName}</span>
-                          <span className="font-mono">{deal.createdAt || 'Recent'}</span>
+                          <span className="font-medium truncate max-w-[110px]">{deal.realtorName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono">{deal.createdAt || 'Recent'}</span>
+                            {!isReadOnly && (
+                              <button
+                                onClick={(e) => handleOpenDeleteSingle(deal.id, deal.address, e)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                title="Delete Deal"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1268,6 +1402,70 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
         </div>
       )}
 
-    </div>
+    
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteModalState.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 relative shadow-2xl border border-[#E2E8F0] space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#0B1F3A]">
+                  {deleteModalState.type === 'bulk'
+                    ? `Delete ${deleteModalState.count} Deals`
+                    : 'Delete Property Deal'}
+                </h3>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  This deal will be permanently removed from your pipeline.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] text-xs text-[#334155] leading-relaxed">
+              {deleteModalState.type === 'bulk' ? (
+                <span>
+                  Are you sure you want to delete <strong className="text-rose-600">{deleteModalState.count}</strong> selected property deals?
+                </span>
+              ) : (
+                <span>
+                  Are you sure you want to delete deal for <strong className="text-[#0B1F3A]">{deleteModalState.dealAddress || 'this property'}</strong>?
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModalState({ isOpen: false, type: 'single' })}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl border border-[#CBD5E1] bg-white text-xs font-bold text-[#475569] hover:bg-[#F8FAFC] transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
   );
 };

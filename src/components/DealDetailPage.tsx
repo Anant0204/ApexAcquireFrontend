@@ -32,7 +32,8 @@ import {
   ShieldCheck,
   TrendingUp,
   Briefcase,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -55,6 +56,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
 }) => {
   const {
     deals,
+    deleteDeal,
     updateDeal,
     updateDealStage,
     assignDeal,
@@ -69,6 +71,25 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('analysis');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDeleteThisDeal = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      if (deleteDeal) {
+        await deleteDeal(deal.id);
+      }
+      onBack();
+    } catch (err) {
+      console.error('Failed to delete deal:', err);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
 
   // Interactive Re-assignment Dropdown
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
@@ -429,10 +450,23 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
           <ArrowLeft className="w-3.5 h-3.5" /> Back to AI Deals Pipeline
         </button>
 
-        <div className="flex items-center gap-2 text-xs text-[#64748B]">
+        <div className="flex items-center gap-3 text-xs text-[#64748B]">
           <span className="font-mono">Deal ID: <strong className="text-[#0B1F3A]">#{deal.id}</strong></span>
           <span>&bull;</span>
           <span>Received: <strong className="text-[#0B1F3A]">{deal.createdAt || 'Today'}</strong></span>
+          {!isReadOnly && (
+            <>
+              <span>&bull;</span>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 rounded-xl font-bold transition-all cursor-pointer shadow-2xs"
+                title="Delete Deal"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Deal</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1608,6 +1642,58 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
 
       </div>
 
-    </div>
+    
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 relative shadow-2xl border border-[#E2E8F0] space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[#0B1F3A]">Delete Property Deal</h3>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  This deal will be permanently removed from your pipeline.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] text-xs text-[#334155] leading-relaxed">
+              Are you sure you want to delete deal for <strong className="text-[#0B1F3A]">{deal.address}</strong>?
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl border border-[#CBD5E1] bg-white text-xs font-bold text-[#475569] hover:bg-[#F8FAFC] transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteThisDeal}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
   );
 };

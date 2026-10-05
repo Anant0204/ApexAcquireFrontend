@@ -48,7 +48,8 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     updateContact, 
     updateContactTemperature, 
     updateContactStage, 
-    archiveContact, 
+    archiveContact,
+    bulkDeleteContacts, 
     bulkUpdateContacts, 
     importContacts, 
     currentUser 
@@ -103,6 +104,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
   const [apiContacts, setApiContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingBulk, setDeletingBulk] = useState(false);
 
   const fetchContacts = async () => {
     try {
@@ -366,6 +368,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
   };
 
   const handleArchive = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this realtor contact from the database?')) return;
     setApiContacts(prev => prev.filter(c => c.id !== id));
     archiveContact(id);
     try {
@@ -376,6 +379,36 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
       });
     } catch (err) {
       console.error('Failed to delete contact:', err);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected realtors from the database?`)) {
+      return;
+    }
+    setDeletingBulk(true);
+    const idsToDelete = [...selectedIds];
+    setApiContacts(prev => prev.filter(c => !idsToDelete.includes(c.id)));
+    setSelectedIds([]);
+    bulkDeleteContacts(idsToDelete);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`${API_BASE_URL}/contacts/bulk-delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ids: idsToDelete })
+      });
+    } catch (err) {
+      console.error('Failed to bulk delete contacts:', err);
+      alert('Failed to delete contacts from database.');
+      fetchContacts();
+    } finally {
+      setDeletingBulk(false);
     }
   };
 
@@ -536,6 +569,14 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
               className="px-3 py-1.5 rounded-lg bg-white border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50 text-xs font-semibold"
             >
               Set DND / Opt Out
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={deletingBulk}
+              className="px-3.5 py-1.5 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {deletingBulk ? 'Deleting...' : `Delete Selected (${selectedIds.length})`}
             </button>
           </div>
         </div>
@@ -707,7 +748,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
 
                       {canCreate && (
                         <button
-                          onClick={() => setArchivingContactId(c.id)}
+                          onClick={() => handleArchive(c.id)}
                           className="p-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50"
                           title="Archive Realtor"
                         >

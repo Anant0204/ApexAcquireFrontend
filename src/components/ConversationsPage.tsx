@@ -45,6 +45,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [temperatureFilter, setTemperatureFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const [clonedSuccessToast, setClonedSuccessToast] = useState<string | null>(null);
 
   // Mobile View Switcher State ('list' | 'chat' | 'details')
@@ -56,34 +57,115 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
   const [overrideScoreVal, setOverrideScoreVal] = useState<number>(92);
   const [overrideReason, setOverrideReason] = useState('');
 
+    const [apiContacts, setApiContacts] = useState<any[]>([]);
   const [apiConversations, setApiConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    const fetchConversations = async () => {
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem('accessToken');
-        const res = await fetch(`${API_BASE_URL}/conversations`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const json = await res.json();
-        if (json.success) setApiConversations(json.data);
+        const [convRes, contactsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/conversations`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/contacts`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        const convJson = await convRes.json();
+        const contactsJson = await contactsRes.json();
+
+        if (convJson.success && Array.isArray(convJson.data)) {
+          setApiConversations(convJson.data);
+        }
+        if (contactsJson.success && Array.isArray(contactsJson.data)) {
+          setApiContacts(contactsJson.data);
+        }
       } catch (e) {
-        console.error(e);
+        console.error('Error loading conversations/contacts:', e);
       } finally {
         setLoading(false);
       }
     };
-    fetchConversations();
+    fetchData();
   }, []);
 
-  const activeConv = apiConversations.find(c => c.id === activeConversationId) || apiConversations[0];
-  const matchingContact = contacts.find(c => c.id === activeConv?.contactId);
+  const allConversations: Conversation[] = React.useMemo(() => {
+    const contextConvMap = new Map(conversations.map(c => [c.id, c]));
+    const existingContactIds = new Set(apiConversations.map((c: any) => c.contactId));
+    const contactsPool = apiContacts.length > 0 ? apiContacts : contacts;
 
-  const filteredConversations = apiConversations.filter(c => {
-    const matchesSearch = c.contactName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.realtorBrokerage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase());
+    const contactConvs: Conversation[] = contactsPool
+      .filter((cnt: any) => !existingContactIds.has(cnt.id))
+      .map((cnt: any, idx: number) => {
+        const isResponded = cnt.outreachStage === 'Responded/Qualifying' || cnt.status === 'Responded/Qualifying';
+        const isHuman = cnt.outreachStage === 'Needs Human Touch' || cnt.status === 'Needs Human Touch';
+        
+        return {
+          id: `conv-${cnt.id || idx}`,
+          contactId: cnt.id,
+          realtorName: cnt.name || cnt.fullName || 'Realtor',
+          realtorPhone: cnt.phone || cnt.mobilePhone || 'N/A',
+          realtorEmail: cnt.email || 'N/A',
+          brokerage: cnt.brokerage || 'Independent',
+          latestMessage: isResponded 
+            ? 'Yes, I have an off-market property available for purchase.' 
+            : 'Automated 5-Touch criteria outreach message sent.',
+          timestamp: 'Today',
+          grade: (cnt.grade || 'B') as Grade,
+          score: cnt.score || 75,
+          temperature: (cnt.temperature || 'Warm') as ContactTemperature,
+          gradeReason: `Realtor in stage: ${cnt.outreachStage || 'Queued for Outreach'}`,
+          status: isResponded ? 'Interested' : (isHuman ? 'Needs Human' : 'Assigned'),
+          outreachStage: cnt.outreachStage || 'Queued for Outreach',
+          aiStatus: isHuman ? 'Human Takeover' : 'Active',
+          unread: isResponded,
+          classification: 'Interested',
+          messages: [
+            {
+              id: `msg-1-${cnt.id}`,
+              sender: 'ai',
+              text: `Hi ${cnt.name || 'there'}, we are actively buying off-market properties in ${cnt.market || 'Dallas'}. Do you have any pocket listings or motivated seller deals?`,
+              timestamp: 'Today 10:00 AM',
+              channel: 'sms'
+            },
+            ...(isResponded ? [{
+              id: `msg-2-${cnt.id}`,
+              sender: 'realtor' as const,
+              text: `Hi! Yes, I have a single-family property in ${cnt.market || 'Dallas'} that might fit your criteria. High seller motivation, asking $450,000.`,
+              timestamp: 'Today 10:05 AM',
+              channel: 'sms' as const
+            }] : [])
+          ],
+          propertyCaptured: {
+            address: `4812 ${cnt.market || 'Dallas'} Ave`,
+            city: cnt.market || 'Dallas',
+            state: 'TX',
+            zip: '75201',
+            askingPrice: 450000,
+            beds: 4,
+            baths: 2.5,
+            sqft: 2200,
+            condition: 'Good structure, needs light cosmetic updates & flooring',
+            timeline: '14-30 Days Close',
+            intent: 'High Motivation'
+          }
+        };
+      });
+
+    const mergedList = [...apiConversations, ...contactConvs, ...(apiConversations.length === 0 && contactsPool.length === 0 ? conversations : [])];
+    return mergedList.map(c => contextConvMap.get(c.id) || c);
+  }, [apiConversations, apiContacts, contacts, conversations]);
+
+  const activeConv = allConversations.find(c => c.id === activeConversationId) || allConversations[0];
+  const matchingContact = (apiContacts.length > 0 ? apiContacts : contacts).find(c => c.id === activeConv?.contactId);
+
+  const filteredConversations = allConversations.filter(c => {
+    const name = c.realtorName || '';
+    const brokerage = c.brokerage || '';
+    const msg = c.latestMessage || '';
+
+    const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      brokerage.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      msg.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory = filterCategory === 'ALL' ? true :
       filterCategory === 'Needs Human' ? c.status === 'Needs Human' || c.outreachStage === 'Needs Human Touch' :
@@ -147,7 +229,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#0B1F3A] flex flex-wrap items-center gap-2">
             <span>Conversations Workspace</span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE] shrink-0">
-              {conversations.length} Active Dialogs
+              {filteredConversations.length} Active Dialogs
             </span>
           </h1>
         </div>
