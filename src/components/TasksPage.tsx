@@ -38,6 +38,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   // Modal State
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<any | null>(null);
 
   // Form Fields
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -142,8 +143,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        setDbContacts(json.data);
+      if (json.success && Array.isArray(json.data)) {
+        setDbContacts(json.data.filter((c: any) => !c.isArchived));
       }
     } catch (e) {
       // Fallback
@@ -157,6 +158,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   }, []);
 
   const openCreateModal = () => {
+    fetchContacts();
     setEditingTaskId(null);
     setNewTaskTitle('');
     setNewTaskDesc('');
@@ -171,6 +173,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
 
   const openEditModal = (task: any) => {
     if (!isAdmin) return;
+    fetchContacts();
     setEditingTaskId(task.id);
     setNewTaskTitle(task.title || '');
     setNewTaskDesc(task.description || '');
@@ -489,12 +492,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
           <span>Upcoming</span>
         </button>
 
-        <button
-          onClick={openCreateModal}
-          className="px-3 py-1.5 rounded-xl text-[#64748B] hover:text-[#0B1F3A] flex items-center gap-1 cursor-pointer transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" /> List
-        </button>
+
       </div>
 
       {/* FILTER & SEARCH BAR */}
@@ -654,14 +652,20 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                       </td>
 
                       {/* Title */}
-                      <td className="py-3 px-4 font-semibold text-[#0F172A] text-xs">
+                      <td 
+                        onClick={() => setSelectedTaskForDetail(task)}
+                        className="py-3 px-4 font-semibold text-[#0F172A] text-xs cursor-pointer hover:text-[#155EEF] transition-colors"
+                      >
                         <span className={isCompleted ? 'line-through text-[#94A3B8]' : ''}>
                           {task.title}
                         </span>
                       </td>
 
                       {/* Description */}
-                      <td className="py-3 px-4 text-[#64748B] text-xs max-w-xs truncate">
+                      <td 
+                        onClick={() => setSelectedTaskForDetail(task)}
+                        className="py-3 px-4 text-[#64748B] text-xs max-w-xs truncate cursor-pointer hover:text-[#0F172A] transition-colors"
+                      >
                         {task.description || '-'}
                       </td>
 
@@ -729,9 +733,180 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
         </div>
       </div>
 
+            {/* TASK DETAILS MODAL */}
+      {selectedTaskForDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-xl bg-white rounded-2xl p-6 shadow-2xl border border-[#E2EAF5] space-y-5 relative animate-in zoom-in-95 duration-150">
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedTaskForDetail(null)}
+              className="absolute top-4 right-4 text-[#94A3B8] hover:text-[#0F172A] p-1.5 rounded-xl hover:bg-[#F1F6FC] transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header: Title & Badges */}
+            <div className="space-y-2 pr-8">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                  selectedTaskForDetail.status === 'Completed' || selectedTaskForDetail.rawStatus === 'COMPLETED'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                }`}>
+                  {selectedTaskForDetail.status === 'Completed' || selectedTaskForDetail.rawStatus === 'COMPLETED' ? 'Completed' : 'Pending / Open'}
+                </span>
+
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EAF2FF] text-[#155EEF] border border-[#BFDBFE]">
+                  Priority: {selectedTaskForDetail.priority || 'HIGH'}
+                </span>
+
+                {selectedTaskForDetail.type && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono text-[#64748B] bg-[#F1F6FC]">
+                    Type: {selectedTaskForDetail.type}
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-xl font-bold text-[#0B1F3A] leading-snug">
+                {selectedTaskForDetail.title}
+              </h2>
+            </div>
+
+            {/* Description Section */}
+            <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-1.5">
+              <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider block">
+                Description & Instructions
+              </span>
+              <p className="text-xs text-[#0F172A] leading-relaxed whitespace-pre-wrap font-normal">
+                {selectedTaskForDetail.description || 'No detailed instructions provided for this task.'}
+              </p>
+            </div>
+
+            {/* Grid Information */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+              
+              {/* Due Date & Time */}
+              <div className="p-3.5 rounded-xl border border-[#E2E8F0] bg-white space-y-1">
+                <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#155EEF]" /> Due Date (CDT)
+                </span>
+                <p className="font-semibold text-[#155EEF] text-xs">
+                  {selectedTaskForDetail.dueDate || 'Today 08:00 AM (CDT)'}
+                </p>
+              </div>
+
+              {/* Assignee */}
+              <div className="p-3.5 rounded-xl border border-[#E2E8F0] bg-white space-y-1">
+                <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[#155EEF]" /> Assigned To
+                </span>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${getAvatarBg(getInitials(selectedTaskForDetail.assignedToName || currentUser.name))}`}>
+                    {getInitials(selectedTaskForDetail.assignedToName || currentUser.name)}
+                  </span>
+                  <span className="font-semibold text-[#0F172A] text-xs truncate">
+                    {selectedTaskForDetail.assignedToName || currentUser.name}
+                  </span>
+                </div>
+              </div>
+
+              {/* Associated Contact (if any) */}
+              {selectedTaskForDetail.relatedContactName && (
+                <div className="sm:col-span-2 p-3.5 rounded-xl border border-[#BFDBFE] bg-[#EAF2FF]/50 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-[#155EEF] uppercase tracking-wider block mb-0.5">
+                      Associated Realtor Contact
+                    </span>
+                    <p className="font-bold text-xs text-[#0B1F3A]">
+                      {selectedTaskForDetail.relatedContactName}
+                    </p>
+                  </div>
+                  {onSelectContact && (
+                    <button
+                      onClick={() => {
+                        const contact = (dbContacts.length > 0 ? dbContacts : contacts).find((c: any) => c.id === selectedTaskForDetail.relatedContactId || c.name === selectedTaskForDetail.relatedContactName);
+                        if (contact) {
+                          setSelectedTaskForDetail(null);
+                          onSelectContact(contact);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-white border border-[#BFDBFE] hover:bg-[#155EEF] hover:text-white text-[#155EEF] text-xs font-bold rounded-lg transition-all cursor-pointer shadow-2xs"
+                    >
+                      View Profile &rarr;
+                    </button>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 border-t border-[#E2E8F0] flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleToggleTaskStatus(selectedTaskForDetail.id, selectedTaskForDetail.status);
+                    setSelectedTaskForDetail((prev: any) => prev ? {
+                      ...prev,
+                      status: prev.status === 'Completed' || prev.rawStatus === 'COMPLETED' ? 'Open' : 'Completed',
+                      rawStatus: prev.rawStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED'
+                    } : null);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all ${
+                    selectedTaskForDetail.status === 'Completed' || selectedTaskForDetail.rawStatus === 'COMPLETED'
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  {selectedTaskForDetail.status === 'Completed' || selectedTaskForDetail.rawStatus === 'COMPLETED' ? 'Mark as Pending' : 'Mark as Completed'}
+                </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const taskToEdit = selectedTaskForDetail;
+                      setSelectedTaskForDetail(null);
+                      openEditModal(taskToEdit);
+                    }}
+                    className="px-3.5 py-2 bg-white border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] hover:text-[#0B1F3A] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Edit
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const taskId = selectedTaskForDetail.id;
+                      setSelectedTaskForDetail(null);
+                      handleDeleteTask(taskId);
+                    }}
+                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                    title="Delete Task"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedTaskForDetail(null)}
+                  className="px-4 py-2 bg-[#F1F6FC] hover:bg-[#E2EAF5] text-[#475569] text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* CREATE / EDIT NEW TASK MODAL */}
       {showAddTaskModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl border border-[#E2E8F0] space-y-4 animate-in fade-in zoom-in-95 duration-150">
             
             {/* Modal Header */}
@@ -796,7 +971,13 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                     className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs text-[#0F172A] focus:outline-none focus:border-[#155EEF] focus:ring-1 focus:ring-[#155EEF] cursor-pointer"
                   >
                     <option value="">None (No Contact Linked)</option>
-                    {(dbContacts.length > 0 ? dbContacts : contacts).map((c: any) => (
+                    {Array.from(
+                      new Map(
+                        (dbContacts.length > 0 ? dbContacts : contacts)
+                          .filter((c: any) => !c.isArchived && (c.name || c.phone))
+                          .map((c: any) => [((c.name || '').trim().toLowerCase() + '_' + (c.phone || '').trim()), c])
+                      ).values()
+                    ).map((c: any) => (
                       <option key={c.id} value={c.id}>
                         {c.name} {c.brokerage ? `(${c.brokerage})` : (c.phone ? `(${c.phone})` : '')}
                       </option>

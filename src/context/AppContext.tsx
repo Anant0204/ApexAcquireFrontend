@@ -54,6 +54,7 @@ interface AppContextType {
   recycleContactToQueued: (id: string) => void;
   advanceContactSequence: (id: string) => void;
   archiveContact: (id: string) => void;
+  bulkDeleteContacts: (ids: string[]) => void;
   bulkUpdateContacts: (ids: string[], updates: Partial<RealtorContact>) => void;
   importContacts: (newContacts: Omit<RealtorContact, 'id'>[]) => void;
 
@@ -65,7 +66,7 @@ interface AppContextType {
   toggleAiTakeover: (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => void;
   overrideGrade: (conversationId: string, newGrade: Grade, newScore: number, reason: string) => void;
   updateConversationTemperature: (conversationId: string, temp: ContactTemperature) => void;
-  cloneLeadToDeals: (conversationId: string) => void;
+  cloneLeadToDeals: (conversationId: string, directConvData?: any) => void;
 
   // Deals State & Actions (Multi-deal support)
   deals: PropertyDeal[];
@@ -76,7 +77,9 @@ interface AppContextType {
   updateDeal: (dealId: string, updates: Partial<PropertyDeal>) => void;
   assignDeal: (dealId: string, userId: string, userName: string, userAvatar?: string) => void;
   addDealActivity: (dealId: string, activity: { type: string; title: string; description: string; actor?: string }) => void;
-  archiveDeal: (dealId: string) => void;
+  archiveDeal: (dealId: string) => Promise<void>;
+  deleteDeal: (dealId: string) => Promise<void>;
+  bulkDeleteDeals: (dealIds: string[]) => Promise<void>;
   addGeneratedContract: (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string; purchasePrice?: number; status?: 'Draft' | 'Sent for Signature' | 'Executed' | 'Archived' }) => void;
   claimLead: (conversationId: string, assignedUserId?: string, assignedUserName?: string) => void;
 
@@ -473,8 +476,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const archiveContact = (id: string) => {
-    setContacts(prev => prev.map(c => c.id === id ? { ...c, isArchived: true, status: 'Not Interested - CLOSED' } : c));
-    logAuditAction(`Soft-deleted (archived) contact`, `Contact #${id}`);
+    setContacts(prev => prev.filter(c => c.id !== id));
+    logAuditAction(`Deleted contact from database`, `Contact #${id}`);
+  };
+
+  const bulkDeleteContacts = (ids: string[]) => {
+    setContacts(prev => prev.filter(c => !ids.includes(c.id)));
+    logAuditAction(`Bulk deleted ${ids.length} contacts from database`, `Batch (${ids.length} items)`);
   };
 
   const bulkUpdateContacts = (ids: string[], updates: Partial<RealtorContact>) => {
@@ -493,26 +501,139 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Conversations Handlers
   const sendMessage = (conversationId: string, text: string) => {
-    setConversations(prev => prev.map(conv => {
-      if (conv.id === conversationId) {
-        const isAiActive = conv.aiStatus === 'Active';
-        const sender = isAiActive ? 'ai' : 'human';
-        const newMsg = {
-          id: `msg-${Date.now()}`,
-          sender: sender as 'ai' | 'human',
-          text,
-          timestamp: 'Just now',
-          channel: 'sms' as const
-        };
-        return {
-          ...conv,
+    const userMsg = {
+      id: `msg-${Date.now()}`,
+      sender: 'human' as const,
+      text,
+      timestamp: 'Just now',
+      channel: 'sms' as const
+    };
+
+    setConversations(prev => {
+      const exists = prev.some(c => c.id === conversationId);
+      if (!exists) {
+        const matchingContact = contacts.find(c => `conv-${c.id}` === conversationId || c.id === conversationId);
+        const newConv: Conversation = {
+          id: conversationId,
+          contactId: matchingContact?.id || conversationId,
+          realtorName: matchingContact?.name || 'Realtor',
+          realtorPhone: matchingContact?.phone || 'N/A',
+          realtorEmail: matchingContact?.email || 'N/A',
+          brokerage: matchingContact?.brokerage || 'Independent',
           latestMessage: text,
           timestamp: 'Just now',
-          messages: [...conv.messages, newMsg]
+          grade: 'A',
+          score: 92,
+          temperature: 'Hot',
+          gradeReason: 'Active Inbound Lead with verified property criteria',
+          status: 'Interested',
+          outreachStage: 'Lead Created',
+          aiStatus: 'Active',
+          unread: false,
+          classification: 'Interested',
+          messages: [userMsg],
+          propertyCaptured: {
+            address: '4812 Bordeaux Ave',
+            city: matchingContact?.market || 'Dallas',
+            state: 'TX',
+            zip: '75201',
+            askingPrice: 420000,
+            beds: 4,
+            baths: 2.5,
+            sqft: 2350,
+            condition: 'Needs cosmetic rehab (kitchen & flooring)',
+            timeline: '14-Day Fast Cash Close',
+            intent: 'High Motivation - Relocating Seller'
+          }
         };
+        return [newConv, ...prev];
       }
-      return conv;
-    }));
+
+      return prev.map(conv => {
+        if (conv.id === conversationId) {
+          return {
+            ...conv,
+            latestMessage: text,
+            timestamp: 'Just now',
+            messages: [...conv.messages, userMsg]
+          };
+        }
+        return conv;
+      });
+    });
+
+    logAuditAction(`Sent outbound message: "${text.substring(0, 30)}..."`, `Conversation #${conversationId}`);
+
+    // 🤖 Smart Automated Realtor Response Simulator for Testing
+    setTimeout(() => {
+      const lower = text.toLowerCase();
+      let replyText = '';
+      let shouldExtract = false;
+      let askingPrice = 420000;
+      let address = '4812 Bordeaux Ave, Dallas, TX 75201';
+
+      if (lower.includes('property') || lower.includes('deal') || lower.includes('criteria') || lower.includes('looking for') || lower.includes('have') || lower.includes('hi') || lower.includes('hello')) {
+        replyText = "Hi! Yes, I represent a motivated seller with an off-market 4-bed, 2.5-bath property at 4812 Bordeaux Ave, Dallas, TX 75201 (2,350 sqft). Asking $420,000. Needs light cosmetic updates (~$40k). Seller wants a 14-day cash close.";
+        shouldExtract = true;
+      } else if (lower.includes('price') || lower.includes('offer') || lower.includes('cash') || lower.includes('$') || lower.includes('loi')) {
+        replyText = "Thanks for the numbers! The seller reviewed your cash terms with zero contingencies. They are ready to execute the purchase agreement if we can close by next Friday.";
+        shouldExtract = true;
+      } else if (lower.includes('photo') || lower.includes('walk') || lower.includes('access') || lower.includes('inspect')) {
+        replyText = "Lockbox code on site is 4829. Feel free to have your acquisitions inspector walk the property tomorrow between 10 AM and 4 PM.";
+      } else {
+        replyText = "Understood! I am sending over the title info and seller disclosure documents for your underwriting review.";
+      }
+
+      const simMsg = {
+        id: `msg-sim-${Date.now()}`,
+        sender: 'realtor' as const,
+        text: replyText,
+        timestamp: 'Just now',
+        channel: 'sms' as const
+      };
+
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          const currentCaptured = conv.propertyCaptured || {
+            address,
+            city: 'Dallas',
+            state: 'TX',
+            zip: '75201',
+            askingPrice,
+            beds: 4,
+            baths: 2.5,
+            sqft: 2350,
+            condition: 'Needs cosmetic rehab (kitchen & flooring)',
+            timeline: '14-Day Fast Cash Close',
+            intent: 'High Motivation - Relocating Seller'
+          };
+
+          const updatedCaptured = shouldExtract ? {
+            ...currentCaptured,
+            address,
+            askingPrice,
+            condition: 'Needs cosmetic rehab (kitchen & flooring)',
+            timeline: '14-Day Fast Cash Close',
+            intent: 'High Motivation - Relocating Seller'
+          } : currentCaptured;
+
+          return {
+            ...conv,
+            latestMessage: replyText,
+            timestamp: 'Just now',
+            status: shouldExtract ? 'Leads With Address' : conv.status,
+            outreachStage: shouldExtract ? 'Lead Created' : conv.outreachStage,
+            temperature: 'Hot',
+            grade: 'A',
+            score: 95,
+            gradeReason: 'AI Simulator: Motivated seller verified with extracted asking price and fast timeline.',
+            propertyCaptured: updatedCaptured,
+            messages: [...conv.messages, simMsg]
+          };
+        }
+        return conv;
+      }));
+    }, 1200);
   };
 
   const toggleAiTakeover = (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
@@ -611,7 +732,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]
     };
 
-    setDeals(prev => [newDeal, ...prev]);
+    setDeals(prev => {
+      const exists = prev.some(d => d.id === newDeal.id || d.address === newDeal.address);
+      if (exists) return prev;
+      return [newDeal, ...prev];
+    });
+
+    // Persist deal to backend
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      fetch(`${API_BASE_URL}/deals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          address: newDeal.address,
+          city: newDeal.city,
+          state: newDeal.state,
+          zip: newDeal.zip,
+          askingPrice: newDeal.askingPrice,
+          contactId: newDeal.contactId,
+          realtorName: newDeal.realtorName,
+          realtorBrokerage: newDeal.realtorBrokerage,
+          realtorPhone: newDeal.realtorPhone,
+          realtorEmail: newDeal.realtorEmail,
+          stage: 'New',
+          temperature: newDeal.temperature,
+          propertyType: newDeal.propertyType,
+          beds: newDeal.beds,
+          baths: newDeal.baths,
+          sqft: newDeal.sqft,
+          isAiInbound: true
+        })
+      }).catch(err => console.error('Failed to persist cloned deal to backend', err));
+    }
 
     // Link deal ID to contact
     if (conv.contactId) {
@@ -820,10 +976,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Updated deal parameters`, `Deal #${dealId}`);
   };
 
-  const archiveDeal = async (dealId: string) => {
-    // Optimistic UI update
-    setDeals(prev => prev.map(d => d.id === dealId ? { ...d, isArchived: true, stage: 'TRASH' } : d));
-    
+    const deleteDeal = async (dealId: string) => {
+    setDeals(prev => prev.filter(d => d.id !== dealId));
     try {
       const token = localStorage.getItem('accessToken');
       if (token && !dealId.startsWith('dl-')) {
@@ -833,9 +987,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
     } catch (err) {
-      console.error('Failed to archive deal on server', err);
+      console.error('Failed to delete deal on server', err);
     }
-    logAuditAction(`Soft-deleted (archived) deal`, `Deal #${dealId}`);
+    logAuditAction(`Deleted deal from workspace`, `Deal #${dealId}`);
+  };
+
+  const archiveDeal = async (dealId: string) => {
+    await deleteDeal(dealId);
+  };
+
+  const bulkDeleteDeals = async (dealIds: string[]) => {
+    setDeals(prev => prev.filter(d => !dealIds.includes(d.id)));
+    try {
+      const token = localStorage.getItem('accessToken');
+      const validDbIds = dealIds.filter(id => !id.startsWith('dl-'));
+      if (token && validDbIds.length > 0) {
+        await fetch(`${API_BASE_URL}/deals/bulk-delete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ ids: validDbIds })
+        });
+      }
+    } catch (err) {
+      console.error('Failed to bulk delete deals on server', err);
+    }
+    logAuditAction(`Bulk deleted ${dealIds.length} deals`, `Batch (${dealIds.length} items)`);
   };
 
   const addGeneratedContract = (dealId: string, contract: { templateName: string; fileName: string; fileType: 'pdf' | 'docx'; generatedBy: string; purchasePrice?: number; status?: 'Draft' | 'Sent for Signature' | 'Executed' | 'Archived' }) => {
@@ -1081,6 +1260,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recycleContactToQueued,
       advanceContactSequence,
       archiveContact,
+      bulkDeleteContacts,
       bulkUpdateContacts,
       importContacts,
       conversations,
@@ -1100,6 +1280,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       assignDeal,
       addDealActivity,
       archiveDeal,
+      deleteDeal,
+      bulkDeleteDeals,
       addGeneratedContract,
       claimLead,
       tasks,
