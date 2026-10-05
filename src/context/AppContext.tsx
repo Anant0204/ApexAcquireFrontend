@@ -202,33 +202,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [integrations, setIntegrations] = useState<GatewayIntegrationsConfig>(INITIAL_INTEGRATIONS);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchInitialData = async () => {
       try {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
-        const res = await fetch(`${API_BASE_URL}/users`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const mappedUsers: UserProfile[] = json.data.map((u: any) => ({
-            id: u.id,
-            name: `${u.firstName} ${u.lastName}`.trim(),
-            email: u.email,
-            role: u.role as UserRole,
-            avatar: (u.firstName?.[0] || 'U').toUpperCase() + (u.lastName?.[0] || 'N').toUpperCase(),
-            title: u.role === 'ADMIN' ? 'Managing Director & Partner' : u.role === 'MANAGER' ? 'Head of Acquisitions' : 'Acquisition Specialist',
-            status: (u.status === 'ACTIVE' ? 'Active' : 'Deactivated') as 'Active' | 'Deactivated',
-            permissions: u.permissions
-          }));
-          setUsers(mappedUsers);
+
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [usersRes, contactsRes, dealsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/users`, { headers }).catch(() => null),
+          fetch(`${API_BASE_URL}/contacts`, { headers }).catch(() => null),
+          fetch(`${API_BASE_URL}/deals/pipeline`, { headers }).catch(() => null)
+        ]);
+
+        if (usersRes) {
+          const json = await usersRes.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            const mappedUsers: UserProfile[] = json.data.map((u: any) => ({
+              id: u.id,
+              name: `${u.firstName} ${u.lastName}`.trim(),
+              email: u.email,
+              role: u.role as UserRole,
+              avatar: (u.firstName?.[0] || 'U').toUpperCase() + (u.lastName?.[0] || 'N').toUpperCase(),
+              title: u.role === 'ADMIN' ? 'Managing Director & Partner' : u.role === 'MANAGER' ? 'Head of Acquisitions' : 'Acquisition Specialist',
+              status: (u.status === 'ACTIVE' ? 'Active' : 'Deactivated') as 'Active' | 'Deactivated',
+              permissions: u.permissions
+            }));
+            setUsers(mappedUsers);
+          }
+        }
+
+        if (contactsRes) {
+          const json = await contactsRes.json();
+          if (json.success && Array.isArray(json.data)) {
+            setContacts(json.data);
+          }
+        }
+
+        if (dealsRes) {
+          const json = await dealsRes.json();
+          if (json.success && Array.isArray(json.data)) {
+            setDeals(json.data);
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch real users from backend:', err);
+        console.error('Failed to fetch initial data from backend:', err);
       }
     };
+
     if (isAuthenticated) {
-      fetchUsers();
+      fetchInitialData();
     }
   }, [isAuthenticated]);
 
@@ -535,7 +558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Conversations Handlers
-  const sendMessage = (conversationId: string, text: string) => {
+  const sendMessage = async (conversationId: string, text: string) => {
     const userMsg = {
       id: `msg-${Date.now()}`,
       sender: 'human' as const,
@@ -587,10 +610,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     logAuditAction(`Sent outbound message: "${text.substring(0, 30)}..."`, `Conversation #${conversationId}`);
 
-
+    // Persist to Backend API
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ text, channel: 'SMS' })
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          const savedMsg = json.data;
+          setConversations(prev => prev.map(c => {
+            if (c.id === conversationId || (savedMsg.conversationId && c.id === savedMsg.conversationId)) {
+              return {
+                ...c,
+                id: savedMsg.conversationId || c.id,
+                messages: c.messages.map(m => m.id === userMsg.id ? { ...m, id: savedMsg.id, timestamp: savedMsg.timestamp } : m)
+              };
+            }
+            return c;
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to persist outbound message to backend:', err);
+    }
   };
 
-  const toggleAiTakeover = (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
+  const toggleAiTakeover = async (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
     setConversations(prev => prev.map(conv => {
       if (conv.id === conversationId) {
         const nextStage: OutreachStage = aiStatus === 'Human Takeover' ? 'Needs Human Touch' : conv.outreachStage;
@@ -604,9 +656,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     logAuditAction(`Changed AI status to ${aiStatus}`, `Conversation #${conversationId}`);
+
+    // Persist to Backend API
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        await fetch(`${API_BASE_URL}/conversations/${conversationId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ aiStatus })
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist AI status to backend:', err);
+    }
   };
 
-  const overrideGrade = (conversationId: string, newGrade: Grade, newScore: number, reason: string) => {
+  const overrideGrade = async (conversationId: string, newGrade: Grade, newScore: number, reason: string) => {
     setConversations(prev => prev.map(conv => conv.id === conversationId ? {
       ...conv,
       grade: newGrade,
@@ -614,6 +683,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       gradeReason: `[Manual Override by ${currentUser.name}]: ${reason}`
     } : conv));
     logAuditAction(`Manually overridden grade to ${newGrade} (${newScore})`, `Conversation #${conversationId}`);
+
+    // Persist to Backend API
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        await fetch(`${API_BASE_URL}/conversations/${conversationId}/grades`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ grade: newGrade, score: newScore, reason })
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist grade override to backend:', err);
+    }
   };
 
   const updateConversationTemperature = (conversationId: string, temp: ContactTemperature) => {
