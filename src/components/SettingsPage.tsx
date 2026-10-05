@@ -66,8 +66,13 @@ export const SettingsPage: React.FC = () => {
 
   // User Management Modal State (Admin Only)
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<any | null>(null);
+  
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('AGENT');
   const [newUserTitle, setNewUserTitle] = useState('Acquisition Agent');
 
@@ -110,7 +115,7 @@ export const SettingsPage: React.FC = () => {
           firstName: newUserName.split(' ')[0] || '',
           lastName: newUserName.split(' ').slice(1).join(' ') || '',
           email: newUserEmail,
-          password: 'Password123!', // Default password for new users
+          password: newUserPassword,
           role: newUserRole,
           jobTitle: newUserTitle
         })
@@ -121,8 +126,84 @@ export const SettingsPage: React.FC = () => {
         setShowAddUserModal(false);
         setNewUserName('');
         setNewUserEmail('');
+        setNewUserPassword('');
       } else {
         alert(json.error?.message || 'Failed to create user');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const openAddModal = () => {
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserRole('AGENT');
+    setNewUserTitle('Acquisition Agent');
+    setShowAddUserModal(true);
+  };
+
+  const openEditModal = (user: any) => {
+    setEditingUserId(user.id);
+    setNewUserName(`${user.firstName} ${user.lastName}`);
+    setNewUserEmail(user.email);
+    setNewUserRole(user.role);
+    setNewUserTitle(user.jobTitle || 'Acquisition Agent');
+    setNewUserPassword(''); // blank implies no change
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUserId) return;
+    try {
+      const token = localStorage.getItem('accessToken');
+      const payload: any = {
+        firstName: newUserName.split(' ')[0] || '',
+        lastName: newUserName.split(' ').slice(1).join(' ') || '',
+        email: newUserEmail,
+        role: newUserRole,
+        jobTitle: newUserTitle
+      };
+      if (newUserPassword) {
+        payload.password = newUserPassword;
+      }
+      
+      const res = await fetch(`${API_BASE_URL}/users/${editingUserId}`, {
+        method: 'PUT',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApiUsers(apiUsers.map(u => u.id === editingUserId ? { ...u, ...json.data } : u));
+        setShowEditUserModal(false);
+      } else {
+        alert(json.error?.message || 'Failed to update user');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_BASE_URL}/users/${userToDelete.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApiUsers(apiUsers.filter(u => u.id !== userToDelete.id));
+        setUserToDelete(null);
+      } else {
+        alert(json.error?.message || 'Failed to delete user');
       }
     } catch (e) {
       console.error(e);
@@ -195,7 +276,7 @@ export const SettingsPage: React.FC = () => {
           <div className="flex justify-between items-center pb-2 border-b border-[#E2E8F0]">
             <h3 className="text-xs font-bold text-[#0B1F3A] uppercase tracking-wider">Active System Users ({apiUsers.length})</h3>
             <button
-              onClick={() => setShowAddUserModal(true)}
+              onClick={openAddModal}
               className="px-3.5 py-1.5 btn-executive-primary text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" /> Add User
@@ -216,14 +297,28 @@ export const SettingsPage: React.FC = () => {
                 </div>
 
                 {u.id !== currentUser.id && (
-                  <button
-                    onClick={() => handleToggleUserStatus(u.id, u.status)}
-                    className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
-                      u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                  >
-                    {u.status === 'ACTIVE' ? 'Deactivate User' : 'Reactivate User'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEditModal(u)}
+                      className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                    >
+                      Edit User
+                    </button>
+                    <button
+                      onClick={() => handleToggleUserStatus(u.id, u.status)}
+                      className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                        u.status === 'ACTIVE' ? 'bg-slate-100 text-rose-600 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {u.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                    <button
+                      onClick={() => setUserToDelete(u)}
+                      className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-red-600 hover:bg-red-200 transition-colors cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -316,12 +411,13 @@ export const SettingsPage: React.FC = () => {
             </button>
             <h3 className="text-lg font-bold text-[#0B1F3A]">Add System User</h3>
             
-            <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateUser} className="space-y-3 text-xs" autoComplete="off">
               <div>
                 <label className="block text-[#475569] font-semibold mb-1">Full Name</label>
                 <input
                   type="text"
                   required
+                  autoComplete="new-name"
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
                   className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
@@ -333,9 +429,23 @@ export const SettingsPage: React.FC = () => {
                 <input
                   type="email"
                   required
+                  autoComplete="new-email"
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
                   className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#475569] font-semibold mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
+                  placeholder="Set user password"
                 />
               </div>
 
@@ -360,6 +470,110 @@ export const SettingsPage: React.FC = () => {
                 Create User & Assign Role
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT USER MODAL (ADMIN ONLY) */}
+      {showEditUserModal && isAdmin && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="executive-panel w-full max-w-md rounded-2xl p-6 relative space-y-4 shadow-2xl border border-[#E2E8F0]">
+            <button onClick={() => setShowEditUserModal(false)} className="absolute top-5 right-5 text-[#64748B] hover:text-[#0F172A]">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-[#0B1F3A]">Edit System User</h3>
+            
+            <form onSubmit={handleUpdateUser} className="space-y-3 text-xs" autoComplete="off">
+              <div>
+                <label className="block text-[#475569] font-semibold mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  autoComplete="new-name"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#475569] font-semibold mb-1">Work Email</label>
+                <input
+                  type="email"
+                  required
+                  autoComplete="new-email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#475569] font-semibold mb-1">Update Password (Optional)</label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm"
+                  placeholder="Leave blank to keep current"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#475569] font-semibold mb-1">Role Assignment</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                  className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-[#0F172A] focus:outline-none focus:border-[#155EEF] shadow-sm cursor-pointer"
+                >
+                  <option value="ADMIN">ADMIN (Full Access)</option>
+                  <option value="MANAGER">MANAGER (Team Workload)</option>
+                  <option value="AGENT">AGENT (Assigned Work)</option>
+                  <option value="READ_ONLY">READ_ONLY (View Only)</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 btn-executive-primary text-white font-bold rounded-xl mt-3 transition-all shadow-md cursor-pointer"
+              >
+                Save Changes
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {userToDelete && isAdmin && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 relative shadow-2xl border border-[#E2E8F0] text-center space-y-4">
+            <div className="mx-auto w-12 h-12 bg-red-100 text-red-600 flex items-center justify-center rounded-full mb-2 shadow-inner">
+              <X className="w-6 h-6" />
+            </div>
+            
+            <h3 className="text-lg font-bold text-[#0B1F3A]">Delete User?</h3>
+            
+            <p className="text-xs text-[#475569] leading-relaxed">
+              Are you sure you want to permanently delete <strong>{userToDelete.firstName} {userToDelete.lastName}</strong>? 
+              This action cannot be undone and will permanently remove their access to the workspace.
+            </p>
+
+            <div className="flex items-center gap-3 pt-4">
+              <button
+                onClick={() => setUserToDelete(null)}
+                className="flex-1 py-2.5 bg-slate-100 text-[#475569] font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="flex-1 py-2.5 bg-red-600 text-white font-bold text-xs rounded-xl shadow-[0_8px_20px_rgba(220,38,38,0.3)] hover:bg-red-700 hover:-translate-y-0.5 transition-all cursor-pointer"
+              >
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

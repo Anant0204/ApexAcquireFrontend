@@ -36,7 +36,7 @@ interface AppContextType {
   currentUser: UserProfile;
   setCurrentUserRole: (role: UserRole) => void;
   isAuthenticated: boolean;
-  login: (email: string, role?: UserRole) => void;
+  login: (email: string, password?: string, role?: UserRole) => Promise<void>;
   logout: () => void;
 
   // User Management
@@ -180,15 +180,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }); // Admin default
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('accessToken'));
   
-  const [contacts, setContacts] = useState<RealtorContact[]>(INITIAL_CONTACTS);
-  const [conversations, setConversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>('conv-1');
+  const [contacts, setContacts] = useState<RealtorContact[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
-  const [deals, setDeals] = useState<PropertyDeal[]>(INITIAL_DEALS);
+  const [deals, setDeals] = useState<PropertyDeal[]>([]);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
 
-  const [tasks, setTasks] = useState<CRMTask[]>(INITIAL_TASKS);
-  const [templates, setTemplates] = useState<EmailTemplate[]>(INITIAL_TEMPLATES);
+  const [tasks, setTasks] = useState<CRMTask[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowRule[]>(INITIAL_WORKFLOWS);
   const [aiConfig, setAiConfig] = useState<AIPersonalityConfig>(INITIAL_AI_CONFIG);
 
@@ -255,13 +255,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Switched active view role to ${role}`, 'User Session');
   };
 
-  const login = async (email: string, role: UserRole = 'ADMIN') => {
+  const login = async (email: string, passwordStr?: string, role: UserRole = 'ADMIN') => {
     try {
-      // In a real app we'd get password from the form, for demo we hardcode the seed password
+      const pwd = passwordStr && passwordStr !== '••••••••••••' ? passwordStr : 'Password123!';
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'password123' })
+        body: JSON.stringify({ email, password: pwd })
       });
       const data = await res.json();
       
@@ -285,11 +285,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         logAuditAction(`User logged in as ${mappedUser.role} via API`, `User Profile (${mappedUser.email})`);
       } else {
-        alert("Login failed: " + (data.error?.message || "Invalid credentials"));
+        throw new Error(data.error?.message || "Invalid credentials");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Login API Error:", err);
-      alert("Failed to connect to Backend API. Make sure the backend server is running on port 5000.");
+      if (err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
+        throw new Error("Failed to connect to server. Please check your network or if the backend is running.");
+      }
+      throw err;
     }
   };
 

@@ -7,12 +7,23 @@ import bgImage from '../assets/real_estate_luxury_bg.png';
 export const LoginPage: React.FC = () => {
   const { login } = useApp();
   const [email, setEmail] = useState('alex.vance@apexacquire.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const [password, setPassword] = useState('Password123!');
   const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, selectedRole);
+    setIsLoading(true);
+    setError(null);
+    try {
+      await login(email, password, selectedRole);
+    } catch (err: any) {
+      setError(err.message || 'Failed to login');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -77,6 +88,11 @@ export const LoginPage: React.FC = () => {
         {/* Login Form Card */}
         <div className="bg-white/95 backdrop-blur-xl border border-[#155EEF]/40 rounded-2xl p-8 space-y-5 shadow-[0_25px_60px_rgba(11,31,58,0.22),0_15px_45px_rgba(21,94,239,0.5)]">
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl text-center">
+                {error}
+              </div>
+            )}
             <div>
               <label className="block text-[11px] font-bold text-[#475569] uppercase tracking-wider mb-1.5">
                 Executive Work Email
@@ -108,9 +124,11 @@ export const LoginPage: React.FC = () => {
 
             <button
               type="submit"
-              className="btn-executive-primary w-full py-3.5 px-4 text-white font-bold text-xs rounded-xl shadow-[0_12px_28px_rgba(21,94,239,0.55)] transition-all flex items-center justify-center gap-2 group cursor-pointer mt-2"
+              disabled={isLoading}
+              className="btn-executive-primary w-full py-3.5 px-4 text-white font-bold text-xs rounded-xl shadow-[0_12px_28px_rgba(21,94,239,0.55)] transition-all flex items-center justify-center gap-2 group cursor-pointer mt-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Sign In To Workspace <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {isLoading ? 'Signing In...' : 'Sign In To Workspace'} 
+              {!isLoading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
         </div>
