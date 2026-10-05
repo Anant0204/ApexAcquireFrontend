@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { 
   UserProfile, 
   UserRole, 
@@ -195,6 +195,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
 
   const [integrations, setIntegrations] = useState<GatewayIntegrationsConfig>(INITIAL_INTEGRATIONS);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+        const res = await fetch('http://localhost:5000/api/v1/users', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const mappedUsers: UserProfile[] = json.data.map((u: any) => ({
+            id: u.id,
+            name: `${u.firstName} ${u.lastName}`.trim(),
+            email: u.email,
+            role: u.role as UserRole,
+            avatar: (u.firstName?.[0] || 'U').toUpperCase() + (u.lastName?.[0] || 'N').toUpperCase(),
+            title: u.role === 'ADMIN' ? 'Managing Director & Partner' : u.role === 'MANAGER' ? 'Head of Acquisitions' : 'Acquisition Specialist',
+            status: (u.status === 'ACTIVE' ? 'Active' : 'Deactivated') as 'Active' | 'Deactivated'
+          }));
+          setUsers(mappedUsers);
+        }
+      } catch (err) {
+        console.error('Failed to fetch real users from backend:', err);
+      }
+    };
+    if (isAuthenticated) {
+      fetchUsers();
+    }
+  }, [isAuthenticated]);
 
   const [settings, setSettings] = useState({
     cadenceIntervalDays: 3,
@@ -677,6 +707,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return d;
     }));
+
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      fetch(`http://localhost:5000/api/v1/deals/${dealId}/assign`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ownerId: userId })
+      }).catch(err => console.error('Failed to sync deal assignment to backend:', err));
+    }
 
     logAuditAction(`Assigned deal to ${userName}`, `Deal #${dealId}`);
   };

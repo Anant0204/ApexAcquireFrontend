@@ -107,6 +107,11 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
   const [yearBuiltInput, setYearBuiltInput] = useState<number>(deal.yearBuilt || 2000);
   const [propertyTypeInput, setPropertyTypeInput] = useState<string>(deal.propertyType || 'Single Family Residence');
 
+  // Assignee state
+  const [currentOwnerId, setCurrentOwnerId] = useState(deal.ownerId);
+  const [currentOwnerName, setCurrentOwnerName] = useState(deal.ownerName || 'Unassigned');
+  const [currentOwnerAvatar, setCurrentOwnerAvatar] = useState(deal.ownerAvatar || deal.ownerName?.substring(0, 2).toUpperCase() || 'UN');
+
   // Contract Generator State
   const [selectedTemplate, setSelectedTemplate] = useState('TREC One to Four Family Residential Contract');
   const [contractPurchasePrice, setContractPurchasePrice] = useState<number>(deal.offerDetails?.purchasePrice || deal.askingPrice || 450000);
@@ -125,6 +130,9 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
   // Sync state whenever deal changes
   useEffect(() => {
     if (deal) {
+      setCurrentOwnerId(deal.ownerId);
+      setCurrentOwnerName(deal.ownerName || 'Unassigned');
+      setCurrentOwnerAvatar(deal.ownerAvatar || deal.ownerName?.substring(0, 2).toUpperCase() || 'UN');
       setMarketValueInput(deal.underwriting?.marketValue?.toString() || Math.round((deal.askingPrice || 450000) * 1.2).toString());
       setArvInput(deal.underwriting?.arv?.toString() || Math.round((deal.askingPrice || 450000) * 1.25).toString());
       setRehabInput(deal.underwriting?.estimatedRehab?.toString() || '45000');
@@ -143,7 +151,30 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
       setYearBuiltInput(deal.yearBuilt || 2000);
       setPropertyTypeInput(deal.propertyType || 'Single Family Residence');
     }
-  }, [deal.id]);
+  }, [deal.id, deal.ownerId, deal.ownerName]);
+
+  const handleAssignTeamMember = async (u: { id: string; name: string; avatar?: string }) => {
+    setCurrentOwnerId(u.id);
+    setCurrentOwnerName(u.name);
+    setCurrentOwnerAvatar(u.avatar || u.name.substring(0, 2).toUpperCase());
+    setIsAssigneeDropdownOpen(false);
+
+    assignDeal(deal.id, u.id, u.name, u.avatar);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`http://localhost:5000/api/v1/deals/${deal.id}/assign`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ownerId: u.id })
+      });
+    } catch (err) {
+      console.error('Failed to update deal owner in backend:', err);
+    }
+  };
 
   // Find linked contact & linked conversation
   const matchedContact = contacts.find(c => c.id === deal.contactId || c.name.toLowerCase() === deal.realtorName.toLowerCase());
@@ -498,9 +529,9 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
             >
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-[#155EEF] text-white text-[9px] font-extrabold flex items-center justify-center">
-                  {deal.ownerAvatar || deal.ownerName?.substring(0, 2).toUpperCase() || 'UN'}
+                  {currentOwnerAvatar || currentOwnerName?.substring(0, 2).toUpperCase() || 'UN'}
                 </span>
-                <span>{deal.ownerName || 'Unassigned'}</span>
+                <span>{currentOwnerName || 'Unassigned'}</span>
               </div>
               {!isReadOnly && <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />}
             </button>
@@ -510,12 +541,9 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
                 {users.map(u => (
                   <button
                     key={u.id}
-                    onClick={() => {
-                      assignDeal(deal.id, u.id, u.name, u.avatar);
-                      setIsAssigneeDropdownOpen(false);
-                    }}
+                    onClick={() => handleAssignTeamMember(u)}
                     className={`w-full px-3 py-2 text-left flex items-center justify-between hover:bg-[#F1F5F9] cursor-pointer ${
-                      deal.ownerId === u.id ? 'bg-[#EAF2FF] font-bold text-[#155EEF]' : 'text-[#475569]'
+                      currentOwnerId === u.id ? 'bg-[#EAF2FF] font-bold text-[#155EEF]' : 'text-[#475569]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -524,7 +552,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
                       </span>
                       <span>{u.name} ({u.role})</span>
                     </div>
-                    {deal.ownerId === u.id && <Check className="w-3.5 h-3.5 text-[#155EEF]" />}
+                    {currentOwnerId === u.id && <Check className="w-3.5 h-3.5 text-[#155EEF]" />}
                   </button>
                 ))}
               </div>
@@ -1533,7 +1561,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
 
               <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
                 <span className="text-[#64748B]">Assigned Specialist:</span>
-                <span className="font-bold text-[#0B1F3A]">{deal.ownerName}</span>
+                <span className="font-bold text-[#0B1F3A]">{currentOwnerName || deal.ownerName}</span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
