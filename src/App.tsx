@@ -34,10 +34,8 @@ const ContactDetailRouteWrapper: React.FC<{
   const [apiContact, setApiContact] = useState<RealtorContact | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const matchedContact = contacts.find(c => c.id === id) || apiContact;
-
   useEffect(() => {
-    if (!matchedContact && id) {
+    if (id) {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
       fetch(`${API_BASE_URL}/contacts/${id}`, {
@@ -52,7 +50,9 @@ const ContactDetailRouteWrapper: React.FC<{
         .catch(err => console.error('Failed to fetch contact details:', err))
         .finally(() => setLoading(false));
     }
-  }, [id, matchedContact]);
+  }, [id]);
+
+  const matchedContact = apiContact || contacts.find(c => c.id === id);
 
   if (loading && !matchedContact) {
     return (
@@ -102,10 +102,8 @@ const DealDetailRouteWrapper: React.FC<{
   const [apiDeal, setApiDeal] = useState<PropertyDeal | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const matchedDeal = deals.find(d => d.id === id) || apiDeal;
-
   useEffect(() => {
-    if (!matchedDeal && id) {
+    if (id) {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
       fetch(`${API_BASE_URL}/deals/${id}`, {
@@ -120,7 +118,10 @@ const DealDetailRouteWrapper: React.FC<{
         .catch(err => console.error('Failed to fetch deal details:', err))
         .finally(() => setLoading(false));
     }
-  }, [id, matchedDeal]);
+  }, [id]);
+
+  const contextDeal = deals.find(d => d.id === id);
+  const matchedDeal = contextDeal ? { ...(apiDeal || {}), ...contextDeal } : (apiDeal || null);
 
   if (loading && !matchedDeal) {
     return (
