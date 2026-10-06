@@ -622,14 +622,16 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     }
   };
 
-  // Team member counts
-  const teamMembersList = [
-    { name: 'Alexander Vance', count: activeDeals.filter(d => d.ownerName?.toLowerCase().includes('alexander')).length },
-    { name: 'Elena Rostova', count: activeDeals.filter(d => d.ownerName?.toLowerCase().includes('elena')).length },
-    { name: 'Marcus Sterling', count: activeDeals.filter(d => d.ownerName?.toLowerCase().includes('marcus')).length },
-    { name: 'Sophia Chen', count: activeDeals.filter(d => d.ownerName?.toLowerCase().includes('sophia')).length },
-    { name: 'David Miller', count: activeDeals.filter(d => d.ownerName?.toLowerCase().includes('david')).length }
-  ];
+  // Dynamic Team member counts
+  const teamMembersList = React.useMemo(() => {
+    if (!users || users.length === 0) return [];
+    return users.map(u => ({
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      count: activeDeals.filter(d => d.ownerId === u.id || (d.ownerName && u.name && d.ownerName.toLowerCase() === u.name.toLowerCase())).length
+    }));
+  }, [users, activeDeals]);
 
   const needArvCount = activeDeals.filter(d => d.managerArvStatus === 'Need Manager ARV' || d.stage === 'New Property' || d.stage === 'New').length;
   const underContractCount = activeDeals.filter(d => normalizeDealStage(d.stage) === 'Offer Accepted').length;
@@ -737,10 +739,10 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
 
             {teamMembersList.map((tm) => (
               <button
-                key={tm.name}
-                onClick={() => setSelectedOwner(selectedOwner === tm.name ? 'ALL' : tm.name)}
+                key={tm.id || tm.name}
+                onClick={() => setSelectedOwner(selectedOwner === tm.name || selectedOwner === tm.id ? 'ALL' : tm.name)}
                 className={`w-full px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-all cursor-pointer ${
-                  selectedOwner === tm.name
+                  selectedOwner === tm.name || selectedOwner === tm.id
                     ? 'bg-[#155EEF] text-white font-bold'
                     : 'text-[#475569] hover:bg-[#F1F5F9] font-medium'
                 }`}
@@ -760,7 +762,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
               }`}
             >
               <span>Need Manager ARV</span>
-              <span className="font-mono text-xs font-bold">{needArvCount || 3}</span>
+              <span className="font-mono text-xs font-bold">{needArvCount}</span>
             </button>
 
             <button
@@ -770,7 +772,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
               }`}
             >
               <span>Under Contract</span>
-              <span className="font-mono text-xs font-bold">{underContractCount || 1}</span>
+              <span className="font-mono text-xs font-bold">{underContractCount}</span>
             </button>
 
             <button
@@ -780,7 +782,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
               }`}
             >
               <span>Closed & Funded</span>
-              <span className="font-mono text-xs font-bold">{closedCount || 1}</span>
+              <span className="font-mono text-xs font-bold">{closedCount}</span>
             </button>
           </div>
 

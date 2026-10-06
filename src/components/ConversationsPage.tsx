@@ -135,7 +135,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
               channel: 'sms' as const
             }] : [])
           ],
-          propertyCaptured: {
+          propertyCaptured: isResponded ? {
             address: `4812 ${cnt.market || 'Dallas'} Ave`,
             city: cnt.market || 'Dallas',
             state: 'TX',
@@ -147,7 +147,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
             condition: 'Good structure, needs light cosmetic updates & flooring',
             timeline: '14-30 Days Close',
             intent: 'High Motivation'
-          }
+          } : undefined
         };
       });
 

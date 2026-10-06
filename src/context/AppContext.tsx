@@ -202,33 +202,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [integrations, setIntegrations] = useState<GatewayIntegrationsConfig>(INITIAL_INTEGRATIONS);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchInitialData = async () => {
       try {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
-        const res = await fetch(`${API_BASE_URL}/users`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const mappedUsers: UserProfile[] = json.data.map((u: any) => ({
-            id: u.id,
-            name: `${u.firstName} ${u.lastName}`.trim(),
-            email: u.email,
-            role: u.role as UserRole,
-            avatar: (u.firstName?.[0] || 'U').toUpperCase() + (u.lastName?.[0] || 'N').toUpperCase(),
-            title: u.role === 'ADMIN' ? 'Managing Director & Partner' : u.role === 'MANAGER' ? 'Head of Acquisitions' : 'Acquisition Specialist',
-            status: (u.status === 'ACTIVE' ? 'Active' : 'Deactivated') as 'Active' | 'Deactivated',
-            permissions: u.permissions
-          }));
-          setUsers(mappedUsers);
+
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [usersRes, contactsRes, dealsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/users`, { headers }).catch(() => null),
+          fetch(`${API_BASE_URL}/contacts`, { headers }).catch(() => null),
+          fetch(`${API_BASE_URL}/deals/pipeline`, { headers }).catch(() => null)
+        ]);
+
+        if (usersRes) {
+          const json = await usersRes.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            const mappedUsers: UserProfile[] = json.data.map((u: any) => ({
+              id: u.id,
+              name: `${u.firstName} ${u.lastName}`.trim(),
+              email: u.email,
+              role: u.role as UserRole,
+              avatar: (u.firstName?.[0] || 'U').toUpperCase() + (u.lastName?.[0] || 'N').toUpperCase(),
+              title: u.role === 'ADMIN' ? 'Managing Director & Partner' : u.role === 'MANAGER' ? 'Head of Acquisitions' : 'Acquisition Specialist',
+              status: (u.status === 'ACTIVE' ? 'Active' : 'Deactivated') as 'Active' | 'Deactivated',
+              permissions: u.permissions
+            }));
+            setUsers(mappedUsers);
+          }
+        }
+
+        if (contactsRes) {
+          const json = await contactsRes.json();
+          if (json.success && Array.isArray(json.data)) {
+            setContacts(json.data);
+          }
+        }
+
+        if (dealsRes) {
+          const json = await dealsRes.json();
+          if (json.success && Array.isArray(json.data)) {
+            setDeals(json.data);
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch real users from backend:', err);
+        console.error('Failed to fetch initial data from backend:', err);
       }
     };
+
     if (isAuthenticated) {
-      fetchUsers();
+      fetchInitialData();
     }
   }, [isAuthenticated]);
 
@@ -586,7 +609,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Conversations Handlers
-  const sendMessage = (conversationId: string, text: string) => {
+  const sendMessage = async (conversationId: string, text: string) => {
     const userMsg = {
       id: `msg-${Date.now()}`,
       sender: 'human' as const,
@@ -608,29 +631,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           brokerage: matchingContact?.brokerage || 'Independent',
           latestMessage: text,
           timestamp: 'Just now',
-          grade: 'A',
-          score: 92,
-          temperature: 'Hot',
-          gradeReason: 'Active Inbound Lead with verified property criteria',
+          grade: 'B',
+          score: 75,
+          temperature: 'Warm',
+          gradeReason: 'Dialogue in progress with realtor',
           status: 'Interested',
-          outreachStage: 'Lead Created',
+          outreachStage: 'Outreach Sent',
           aiStatus: 'Active',
           unread: false,
           classification: 'Interested',
           messages: [userMsg],
-          propertyCaptured: {
-            address: '4812 Bordeaux Ave',
-            city: matchingContact?.market || 'Dallas',
-            state: 'TX',
-            zip: '75201',
-            askingPrice: 420000,
-            beds: 4,
-            baths: 2.5,
-            sqft: 2350,
-            condition: 'Needs cosmetic rehab (kitchen & flooring)',
-            timeline: '14-Day Fast Cash Close',
-            intent: 'High Motivation - Relocating Seller'
-          }
+          propertyCaptured: undefined
         };
         return [newConv, ...prev];
       }
@@ -650,79 +661,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     logAuditAction(`Sent outbound message: "${text.substring(0, 30)}..."`, `Conversation #${conversationId}`);
 
-    // 🤖 Smart Automated Realtor Response Simulator for Testing
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      let replyText = '';
-      let shouldExtract = false;
-      let askingPrice = 420000;
-      let address = '4812 Bordeaux Ave, Dallas, TX 75201';
-
-      if (lower.includes('property') || lower.includes('deal') || lower.includes('criteria') || lower.includes('looking for') || lower.includes('have') || lower.includes('hi') || lower.includes('hello')) {
-        replyText = "Hi! Yes, I represent a motivated seller with an off-market 4-bed, 2.5-bath property at 4812 Bordeaux Ave, Dallas, TX 75201 (2,350 sqft). Asking $420,000. Needs light cosmetic updates (~$40k). Seller wants a 14-day cash close.";
-        shouldExtract = true;
-      } else if (lower.includes('price') || lower.includes('offer') || lower.includes('cash') || lower.includes('$') || lower.includes('loi')) {
-        replyText = "Thanks for the numbers! The seller reviewed your cash terms with zero contingencies. They are ready to execute the purchase agreement if we can close by next Friday.";
-        shouldExtract = true;
-      } else if (lower.includes('photo') || lower.includes('walk') || lower.includes('access') || lower.includes('inspect')) {
-        replyText = "Lockbox code on site is 4829. Feel free to have your acquisitions inspector walk the property tomorrow between 10 AM and 4 PM.";
-      } else {
-        replyText = "Understood! I am sending over the title info and seller disclosure documents for your underwriting review.";
-      }
-
-      const simMsg = {
-        id: `msg-sim-${Date.now()}`,
-        sender: 'realtor' as const,
-        text: replyText,
-        timestamp: 'Just now',
-        channel: 'sms' as const
-      };
-
-      setConversations(prev => prev.map(conv => {
-        if (conv.id === conversationId) {
-          const currentCaptured = conv.propertyCaptured || {
-            address,
-            city: 'Dallas',
-            state: 'TX',
-            zip: '75201',
-            askingPrice,
-            beds: 4,
-            baths: 2.5,
-            sqft: 2350,
-            condition: 'Needs cosmetic rehab (kitchen & flooring)',
-            timeline: '14-Day Fast Cash Close',
-            intent: 'High Motivation - Relocating Seller'
-          };
-
-          const updatedCaptured = shouldExtract ? {
-            ...currentCaptured,
-            address,
-            askingPrice,
-            condition: 'Needs cosmetic rehab (kitchen & flooring)',
-            timeline: '14-Day Fast Cash Close',
-            intent: 'High Motivation - Relocating Seller'
-          } : currentCaptured;
-
-          return {
-            ...conv,
-            latestMessage: replyText,
-            timestamp: 'Just now',
-            status: shouldExtract ? 'Leads With Address' : conv.status,
-            outreachStage: shouldExtract ? 'Lead Created' : conv.outreachStage,
-            temperature: 'Hot',
-            grade: 'A',
-            score: 95,
-            gradeReason: 'AI Simulator: Motivated seller verified with extracted asking price and fast timeline.',
-            propertyCaptured: updatedCaptured,
-            messages: [...conv.messages, simMsg]
-          };
+    // Persist to Backend API
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ text, channel: 'SMS' })
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          const savedMsg = json.data;
+          setConversations(prev => prev.map(c => {
+            if (c.id === conversationId || (savedMsg.conversationId && c.id === savedMsg.conversationId)) {
+              return {
+                ...c,
+                id: savedMsg.conversationId || c.id,
+                messages: c.messages.map(m => m.id === userMsg.id ? { ...m, id: savedMsg.id, timestamp: savedMsg.timestamp } : m)
+              };
+            }
+            return c;
+          }));
         }
-        return conv;
-      }));
-    }, 1200);
+      }
+    } catch (err) {
+      console.error('Failed to persist outbound message to backend:', err);
+    }
   };
 
-  const toggleAiTakeover = (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
+  const toggleAiTakeover = async (conversationId: string, aiStatus: 'Active' | 'Human Takeover' | 'AI Off') => {
     setConversations(prev => prev.map(conv => {
       if (conv.id === conversationId) {
         const nextStage: OutreachStage = aiStatus === 'Human Takeover' ? 'Needs Human Touch' : conv.outreachStage;
@@ -736,9 +707,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     logAuditAction(`Changed AI status to ${aiStatus}`, `Conversation #${conversationId}`);
+
+    // Persist to Backend API
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        await fetch(`${API_BASE_URL}/conversations/${conversationId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ aiStatus })
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist AI status to backend:', err);
+    }
   };
 
-  const overrideGrade = (conversationId: string, newGrade: Grade, newScore: number, reason: string) => {
+  const overrideGrade = async (conversationId: string, newGrade: Grade, newScore: number, reason: string) => {
     setConversations(prev => prev.map(conv => conv.id === conversationId ? {
       ...conv,
       grade: newGrade,
@@ -746,6 +734,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       gradeReason: `[Manual Override by ${currentUser.name}]: ${reason}`
     } : conv));
     logAuditAction(`Manually overridden grade to ${newGrade} (${newScore})`, `Conversation #${conversationId}`);
+
+    // Persist to Backend API
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        await fetch(`${API_BASE_URL}/conversations/${conversationId}/grades`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ grade: newGrade, score: newScore, reason })
+        });
+      }
+    } catch (err) {
+      console.error('Failed to persist grade override to backend:', err);
+    }
   };
 
   const updateConversationTemperature = (conversationId: string, temp: ContactTemperature) => {

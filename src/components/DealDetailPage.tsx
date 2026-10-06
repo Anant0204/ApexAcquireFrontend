@@ -48,7 +48,7 @@ interface DealDetailPageProps {
 type WorkspaceTab = 'analysis' | 'conversation' | 'contact' | 'contracts' | 'timeline';
 
 export const DealDetailPage: React.FC<DealDetailPageProps> = ({
-  deal,
+  deal: initialDeal,
   onBack,
   onOpenConversation,
   onSelectContact,
@@ -68,6 +68,8 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
     users,
     sendMessage
   } = useApp();
+
+  const deal = deals.find(d => d.id === initialDeal.id) || initialDeal;
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('analysis');
@@ -327,20 +329,39 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
   };
 
   // Manager ARV Approval Handlers
-  const handleApproveArv = () => {
+  const handleApproveArv = async () => {
     if (isReadOnly) return;
     const currentArv = parseFloat(arvInput) || deal.underwriting?.arv || 0;
-    updateDeal(deal.id, {
-      managerArvStatus: 'Manager Approved ARV',
+    const updates = {
+      managerArvStatus: 'Manager Approved ARV' as const,
       arvApprovedBy: currentUser.name,
       arvApprovedAt: new Date().toLocaleDateString('en-US')
-    });
+    };
+
+    updateDeal(deal.id, updates);
     addDealActivity(deal.id, {
       type: 'underwriting_updated',
       title: 'Manager Approved ARV',
       description: `ARV of $${currentArv.toLocaleString()} officially verified & approved by ${currentUser.name}. Ready for Offer & Contract generation.`,
       actor: currentUser.name
     });
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token && !deal.id.startsWith('dl-')) {
+        await fetch(`${API_BASE_URL}/deals/${deal.id}/analysis`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(updates)
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save ARV approval to backend:', err);
+    }
+
     try {
       confetti({
         particleCount: 50,
@@ -352,21 +373,40 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
     setTimeout(() => setAnalysisSuccessMsg(null), 4000);
   };
 
-  const handleSetArvStatus = (newStatus: 'Need Manager ARV' | 'ARV RAN' | 'Manager Approved ARV') => {
+  const handleSetArvStatus = async (newStatus: 'Need Manager ARV' | 'ARV RAN' | 'Manager Approved ARV') => {
     if (isReadOnly) return;
-    updateDeal(deal.id, {
+    const updates = {
       managerArvStatus: newStatus,
       ...(newStatus === 'Manager Approved ARV' ? {
         arvApprovedBy: currentUser.name,
         arvApprovedAt: new Date().toLocaleDateString('en-US')
       } : {})
-    });
+    };
+
+    updateDeal(deal.id, updates);
     addDealActivity(deal.id, {
       type: 'underwriting_updated',
       title: `Manager ARV Status: ${newStatus}`,
       description: `Underwriting check status set to "${newStatus}" by ${currentUser.name}`,
       actor: currentUser.name
     });
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token && !deal.id.startsWith('dl-')) {
+        await fetch(`${API_BASE_URL}/deals/${deal.id}/analysis`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(updates)
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save ARV status to backend:', err);
+    }
+
     setAnalysisSuccessMsg(`ARV status set to "${newStatus}"`);
     setTimeout(() => setAnalysisSuccessMsg(null), 3500);
   };
@@ -548,8 +588,8 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
         <div className="pt-4 border-t border-[#E2E8F0] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-[#F8FAFC] p-3 rounded-xl text-xs">
           
           {/* Assigned Team Member Dropdown */}
-          <div className="relative">
-            <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">
+          <div className="relative min-w-0">
+            <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1 truncate">
               Assigned Team Member
             </label>
             <button
@@ -560,15 +600,15 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
                 }
               }}
               disabled={isReadOnly}
-              className="w-full px-3 py-2 bg-white border border-[#CBD5E1] rounded-xl font-bold text-[#0B1F3A] flex items-center justify-between cursor-pointer hover:border-[#155EEF] transition-all"
+              className="w-full px-3 py-2 bg-white border border-[#CBD5E1] rounded-xl font-bold text-[#0B1F3A] flex items-center justify-between cursor-pointer hover:border-[#155EEF] transition-all min-w-0"
             >
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#155EEF] text-white text-[9px] font-extrabold flex items-center justify-center">
+              <div className="flex items-center gap-2 truncate">
+                <span className="w-5 h-5 rounded-full bg-[#155EEF] text-white text-[9px] font-extrabold flex items-center justify-center shrink-0">
                   {currentOwnerAvatar || currentOwnerName?.substring(0, 2).toUpperCase() || 'UN'}
                 </span>
-                <span>{currentOwnerName || 'Unassigned'}</span>
+                <span className="truncate">{currentOwnerName || 'Unassigned'}</span>
               </div>
-              {!isReadOnly && <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8]" />}
+              {!isReadOnly && <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] shrink-0 ml-1" />}
             </button>
 
             {isAssigneeDropdownOpen && (
@@ -581,13 +621,13 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
                       currentOwnerId === u.id ? 'bg-[#EAF2FF] font-bold text-[#155EEF]' : 'text-[#475569]'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-[#155EEF]/10 text-[#155EEF] text-[9px] font-bold flex items-center justify-center">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="w-5 h-5 rounded-full bg-[#155EEF]/10 text-[#155EEF] text-[9px] font-bold flex items-center justify-center shrink-0">
                         {u.avatar || u.name.substring(0, 2).toUpperCase()}
                       </span>
-                      <span>{u.name} ({u.role})</span>
+                      <span className="truncate">{u.name} ({u.role})</span>
                     </div>
-                    {currentOwnerId === u.id && <Check className="w-3.5 h-3.5 text-[#155EEF]" />}
+                    {currentOwnerId === u.id && <Check className="w-3.5 h-3.5 text-[#155EEF] shrink-0 ml-1" />}
                   </button>
                 ))}
               </div>
@@ -595,15 +635,15 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
           </div>
 
           {/* Deal Stage Selector */}
-          <div className="relative">
-            <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">
+          <div className="relative min-w-0">
+            <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1 truncate">
               Deal Pipeline Stage
             </label>
             <select
               value={normStage}
               disabled={isReadOnly}
               onChange={(e) => updateDealStage(deal.id, e.target.value as DealStage)}
-              className="w-full px-3 py-2 bg-white border border-[#CBD5E1] rounded-xl font-bold text-[#0B1F3A] focus:outline-none focus:border-[#155EEF] cursor-pointer"
+              className="w-full px-3 py-2 bg-white border border-[#CBD5E1] rounded-xl font-bold text-[#0B1F3A] focus:outline-none focus:border-[#155EEF] cursor-pointer truncate"
             >
               {PIPELINE_STAGES.map((s: DealStage) => (
                 <option key={s} value={s}>{STAGE_CONFIG[s]?.icon || '⚡'} {s}</option>
@@ -612,8 +652,8 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
           </div>
 
           {/* Temperature Selector */}
-          <div>
-            <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1">
+          <div className="min-w-0">
+            <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1 truncate">
               Deal Temperature
             </label>
             <select
@@ -627,7 +667,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
                   description: `Acquisitions priority adjusted.`
                 });
               }}
-              className={`w-full px-3 py-2 bg-white border rounded-xl font-bold cursor-pointer focus:outline-none ${
+              className={`w-full px-3 py-2 bg-white border rounded-xl font-bold cursor-pointer focus:outline-none truncate ${
                 deal.temperature === 'Hot' ? 'text-rose-700 border-rose-300 bg-rose-50/50' :
                 deal.temperature === 'Warm' ? 'text-amber-700 border-amber-300 bg-amber-50/50' :
                 'text-blue-700 border-blue-300 bg-blue-50/50'
@@ -640,42 +680,55 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
           </div>
 
           {/* Manager Check ARV Status & Quick Approve */}
-          <div>
+          <div className="min-w-0">
             <label className="text-[10px] font-bold uppercase text-[#64748B] block mb-1 flex items-center justify-between">
-              <span>Manager Check ARV</span>
+              <span className="truncate">Manager Check ARV</span>
               {deal.managerArvStatus === 'Manager Approved ARV' && (
-                <span className="text-[9px] text-[#0284C7] font-bold">✓ Approved</span>
+                <span className="text-[9px] text-emerald-600 font-bold shrink-0">
+                  {deal.arvApprovedBy ? `By ${deal.arvApprovedBy}` : '✓ Approved'}
+                </span>
               )}
             </label>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 w-full min-w-0">
               <select
                 value={deal.managerArvStatus || (deal.underwriting?.arv && normStage !== 'New' ? 'Manager Approved ARV' : 'ARV RAN')}
                 disabled={isReadOnly}
-                onChange={(e) => handleSetArvStatus(e.target.value as any)}
-                className={`flex-1 px-2.5 py-2 rounded-xl text-xs font-bold border cursor-pointer focus:outline-none ${
-                  (deal.managerArvStatus === 'Manager Approved ARV' || (!deal.managerArvStatus && deal.underwriting?.arv && normStage !== 'New'))
-                    ? 'bg-[#0284C7] text-white border-[#0284C7]'
+                onChange={(e) => {
+                  if (e.target.value === 'Manager Approved ARV') {
+                    handleApproveArv();
+                  } else {
+                    handleSetArvStatus(e.target.value as any);
+                  }
+                }}
+                className={`flex-1 min-w-0 px-2.5 py-2 rounded-xl text-xs font-bold border cursor-pointer focus:outline-none truncate transition-all ${
+                  deal.managerArvStatus === 'Manager Approved ARV' || (!deal.managerArvStatus && deal.underwriting?.arv && normStage !== 'New')
+                    ? 'bg-sky-50/90 text-sky-800 border-sky-300'
                     : deal.managerArvStatus === 'ARV RAN'
-                    ? 'bg-[#FEF3C7] text-[#B45309] border-[#FDE68A]'
+                    ? 'bg-amber-50/90 text-amber-800 border-amber-300'
                     : 'bg-white text-[#475569] border-[#CBD5E1]'
                 }`}
               >
-                <option value="Manager Approved ARV">Manager Approved ARV</option>
-                <option value="ARV RAN">ARV RAN</option>
-                <option value="Need Manager ARV">Need Manager ARV</option>
+                <option value="Need Manager ARV">⏳ Need Manager ARV</option>
+                <option value="ARV RAN">⚡ ARV RAN</option>
+                <option value="Manager Approved ARV">🛡️ Manager Approved ARV</option>
               </select>
 
-              {deal.managerArvStatus !== 'Manager Approved ARV' && (
+              {deal.managerArvStatus === 'Manager Approved ARV' ? (
+                <div className="shrink-0 px-2.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1 whitespace-nowrap shadow-2xs">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Approved</span>
+                </div>
+              ) : !isReadOnly ? (
                 <button
                   type="button"
                   onClick={handleApproveArv}
-                  title="1-Click Manager Approve ARV"
-                  className="px-2.5 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+                  title="Click to Officially Approve ARV"
+                  className="shrink-0 px-3 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] active:scale-98 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all whitespace-nowrap"
                 >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Approve</span>
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>Approve</span>
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
