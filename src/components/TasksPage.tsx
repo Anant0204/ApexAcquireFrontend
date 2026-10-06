@@ -24,7 +24,7 @@ interface TasksPageProps {
 }
 
 export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContact }) => {
-  const { users, currentUser, contacts, tasks: contextTasks, addTask: addContextTask, updateTask: updateContextTask, deleteTask: deleteContextTask } = useApp();
+  const { users, currentUser, contacts, tasks: contextTasks, addTask: addContextTask, updateTask: updateContextTask, deleteTask: deleteContextTask, hasPermission } = useApp();
   
   // Tabs & Filters
   const [activeTab, setActiveTab] = useState<'ALL' | 'DUE_TODAY' | 'OVERDUE' | 'UPCOMING'>('ALL');
@@ -172,7 +172,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   };
 
   const openEditModal = (task: any) => {
-    if (!isAdmin) return;
+    if (!canEdit) return;
     fetchContacts();
     setEditingTaskId(task.id);
     setNewTaskTitle(task.title || '');
@@ -325,7 +325,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    if (!isAdmin) return;
+    if (!canDelete) return;
     if (!confirm('Are you sure you want to delete this task?')) return;
     setApiTasks(prev => prev.filter(t => t.id !== taskId));
     try {
@@ -356,11 +356,15 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
 
   const isReadOnly = currentUser.role === 'READ_ONLY';
   const isAdmin = currentUser.role === 'ADMIN';
+  const canEdit = isAdmin || hasPermission('Task Manager', 'Edit') || hasPermission('Task Manager', 'Manage');
+  const canDelete = isAdmin || hasPermission('Task Manager', 'Delete') || hasPermission('Task Manager', 'Manage');
+  const canCreate = isAdmin || hasPermission('Task Manager', 'Create') || hasPermission('Task Manager', 'Manage');
+  const canViewAll = isAdmin || currentUser.role === 'MANAGER'; // Managers and Admins see all tasks
 
   // Filter Tasks
   const filteredTasks = apiTasks.filter(t => {
-    // Role-based visibility check: non-admins only see tasks assigned to them
-    if (!isAdmin) {
+    // Role-based visibility check: non-admins/managers only see tasks assigned to them
+    if (!canViewAll) {
       const isAssigned = t.assignedToId === currentUser.id || 
         t.assignedToName?.toLowerCase() === currentUser.name?.toLowerCase() ||
         (t.assignedTo && t.assignedTo.email === currentUser.email);
@@ -393,7 +397,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     return 0;
   });
 
-  const visibleTasks = isAdmin ? apiTasks : apiTasks.filter(t => 
+  const visibleTasks = canViewAll ? apiTasks : apiTasks.filter(t => 
     t.assignedToId === currentUser.id || 
     t.assignedToName?.toLowerCase() === currentUser.name?.toLowerCase() ||
     (t.assignedTo && t.assignedTo.email === currentUser.email)
@@ -427,7 +431,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
-          {!isReadOnly && (
+          {canCreate && !isReadOnly && (
             <button
               onClick={openCreateModal}
               className="px-4 py-2 bg-[#0B1F3A] hover:bg-[#155EEF] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
@@ -702,7 +706,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {isAdmin ? (
+                          {canEdit ? (
                             <>
                               <button
                                 onClick={() => openEditModal(task)}
@@ -711,13 +715,15 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                onClick={() => handleDeleteTask(task.id)}
-                                className="p-1 rounded-lg text-[#94A3B8] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                title="Delete Task"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={() => handleDeleteTask(task.id)}
+                                  className="p-1 rounded-lg text-[#94A3B8] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title="Delete Task"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </>
                           ) : (
                             <span className="text-[#94A3B8] text-[11px]">-</span>

@@ -232,6 +232,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [isAuthenticated]);
 
+  // Real-time Permission Sync via Silent Background Polling
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    let isFetching = false;
+    const syncPermissions = async () => {
+      if (isFetching) return;
+      try {
+        isFetching = true;
+        const token = localStorage.getItem('accessToken');
+        if (!token) return;
+
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data?.user) {
+            const apiUser = json.data.user;
+            // Check if permissions have changed to prevent unnecessary re-renders
+            const newPermissionsStr = JSON.stringify(apiUser.permissions || {});
+            
+            setCurrentUser(prevUser => {
+              const prevPermissionsStr = JSON.stringify(prevUser.permissions || {});
+              if (newPermissionsStr !== prevPermissionsStr || prevUser.role !== apiUser.role) {
+                // If they changed, update the user state silently
+                const updatedUser = {
+                  ...prevUser,
+                  role: apiUser.role as UserRole,
+                  permissions: apiUser.permissions
+                };
+                localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+                return updatedUser;
+              }
+              return prevUser;
+            });
+          }
+        }
+      } catch (error) {
+        // Silent catch, do not flood console if network is temporarily unstable
+      } finally {
+        isFetching = false;
+      }
+    };
+
+    // Run every 5 seconds for "Day/Night" real-time feel
+    const interval = setInterval(syncPermissions, 5000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   const [settings, setSettings] = useState({
     cadenceIntervalDays: 3,
     sendingHoursStart: '08:00',

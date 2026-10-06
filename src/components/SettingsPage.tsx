@@ -786,7 +786,7 @@ export const SettingsPage: React.FC = () => {
               <button
                 onClick={handleSavePermissions}
                 disabled={isSavingPermissions}
-                className="px-6 py-2.5 rounded-lg text-xs font-bold text-[#0F172A] bg-[#FFD100] hover:bg-[#FACC15] shadow-sm transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 rounded-lg text-xs font-bold text-white bg-[#155EEF] hover:bg-[#155EEF] shadow-sm transition-colors cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSavingPermissions ? 'Saving...' : 'Save Changes'}
               </button>
