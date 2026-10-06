@@ -178,16 +178,16 @@ const App: React.FC = () => {
   const rolePath = userRole.toLowerCase().replace('_', '-');
   const baseAllowedTabs = ['dashboard', 'outreach', 'deals', 'conversations', 'tasks', 'contacts', 'marketing', 'templates', 'reports', 'settings'];
   const userAllowedTabs = baseAllowedTabs.filter(tab => {
-    if (tab === 'dashboard') return hasPermission('Dashboard', 'Show');
-    if (tab === 'outreach') return hasPermission('Outreach Pipeline', 'Show');
-    if (tab === 'contacts') return hasPermission('Contacts Directory', 'View') || hasPermission('Contacts Directory', 'Show');
-    if (tab === 'deals') return hasPermission('AI Deals & Offers', 'View') || hasPermission('AI Deals & Offers', 'Show');
-    if (tab === 'conversations') return hasPermission('Conversations', 'View') || hasPermission('Conversations', 'Show');
-    if (tab === 'tasks') return hasPermission('Task Manager', 'View') || hasPermission('Task Manager', 'Show');
-    if (tab === 'marketing') return hasPermission('Marketing', 'View') || hasPermission('Marketing', 'Show');
-    if (tab === 'templates') return hasPermission('Templates & Automations', 'View') || hasPermission('Templates & Automations', 'Show');
-    if (tab === 'reports') return hasPermission('Reports & Audit', 'Show') || hasPermission('Reports & Audit', 'View');
-    if (tab === 'settings') return hasPermission('Settings', 'View') || hasPermission('Settings', 'Show') || hasPermission('Settings', 'Manage');
+    if (tab === 'dashboard') return hasPermission('Dashboard', 'VIEW');
+    if (tab === 'outreach') return hasPermission('Outreach Pipeline', 'VIEW');
+    if (tab === 'contacts') return hasPermission('Contacts Directory', 'VIEW');
+    if (tab === 'deals') return hasPermission('AI Deals & Offers', 'VIEW');
+    if (tab === 'conversations') return hasPermission('Conversations', 'VIEW');
+    if (tab === 'tasks') return hasPermission('Task Manager', 'VIEW');
+    if (tab === 'marketing') return hasPermission('Marketing', 'VIEW');
+    if (tab === 'templates') return hasPermission('Templates & Automations', 'VIEW');
+    if (tab === 'reports') return hasPermission('Reports & Audit', 'VIEW');
+    if (tab === 'settings') return hasPermission('Settings', 'VIEW');
     
     return true;
   });

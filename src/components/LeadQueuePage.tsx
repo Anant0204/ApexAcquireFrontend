@@ -7,7 +7,7 @@ interface LeadQueueProps {
 }
 
 export const LeadQueuePage: React.FC<LeadQueueProps> = ({ onNavigate }) => {
-  const { conversations, claimLead, currentUser, users } = useApp();
+  const { conversations, claimLead, currentUser, users, hasPermission } = useApp();
   const [activeTab, setActiveTab] = useState<'address' | 'needs_human'>('address');
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -31,8 +31,8 @@ export const LeadQueuePage: React.FC<LeadQueueProps> = ({ onNavigate }) => {
     return nameMatch || brokerMatch || addressMatch || msgMatch || ownerMatch;
   });
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
-  const isAdminOrManager = currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER';
+  const canEditOutreach = hasPermission('Outreach Pipeline', 'EDIT');
+  const isAdminOrManager = canEditOutreach;
 
   const handleClaim = (convId: string, targetUserId?: string, targetUserName?: string) => {
     claimLead(convId, targetUserId, targetUserName);
@@ -160,7 +160,7 @@ export const LeadQueuePage: React.FC<LeadQueueProps> = ({ onNavigate }) => {
 
                 {/* ACTION BUTTONS */}
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start sm:justify-end pt-3 md:pt-0 border-t md:border-t-0 border-[#E2E8F0]">
-                  {!isReadOnly && (
+                  {canEditOutreach && (
                     <>
                       {/* ADMIN / MANAGER REASSIGNMENT SELECTOR */}
                       {isAdminOrManager && (

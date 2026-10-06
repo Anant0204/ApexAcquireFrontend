@@ -354,12 +354,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
     );
   };
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
-  const isAdmin = currentUser.role === 'ADMIN';
-  const canEdit = isAdmin || hasPermission('Task Manager', 'Edit') || hasPermission('Task Manager', 'Manage');
-  const canDelete = isAdmin || hasPermission('Task Manager', 'Delete') || hasPermission('Task Manager', 'Manage');
-  const canCreate = isAdmin || hasPermission('Task Manager', 'Create') || hasPermission('Task Manager', 'Manage');
-  const canViewAll = isAdmin || currentUser.role === 'MANAGER'; // Managers and Admins see all tasks
+  const canEdit = hasPermission('Task Manager', 'EDIT');
+  const canDelete = hasPermission('Task Manager', 'DELETE');
+  const canCreate = hasPermission('Task Manager', 'CREATE');
+  const canViewAll = currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER';
 
   // Filter Tasks
   const filteredTasks = apiTasks.filter(t => {
@@ -431,7 +429,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
-          {canCreate && !isReadOnly && (
+          {canCreate && (
             <button
               onClick={openCreateModal}
               className="px-4 py-2 bg-[#0B1F3A] hover:bg-[#155EEF] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
@@ -869,7 +867,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
                   {selectedTaskForDetail.status === 'Completed' || selectedTaskForDetail.rawStatus === 'COMPLETED' ? 'Mark as Pending' : 'Mark as Completed'}
                 </button>
 
-                {isAdmin && (
+                {canEdit && (
                   <button
                     onClick={() => {
                       const taskToEdit = selectedTaskForDetail;
@@ -884,7 +882,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onNavigate, onSelectContac
               </div>
 
               <div className="flex items-center gap-2">
-                {isAdmin && (
+                {canDelete && (
                   <button
                     onClick={() => {
                       const taskId = selectedTaskForDetail.id;

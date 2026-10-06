@@ -197,7 +197,7 @@ export const getStageConfig = (stage: string): StageVisualConfig => {
 };
 
 export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
-  const { deals, addDeal, updateDealStage, archiveDeal, deleteDeal, bulkDeleteDeals, contacts, users, currentUser } = useApp();
+  const { deals, addDeal, updateDealStage, archiveDeal, deleteDeal, bulkDeleteDeals, contacts, users, currentUser, hasPermission } = useApp();
 
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [selectedView, setSelectedView] = useState<'ALL' | 'SORT_ACTIVITY' | 'NEED_MANAGER_ARV' | 'UNDER_CONTRACT' | 'CLOSED_FUNDED'>('ALL');
@@ -410,20 +410,25 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
     return 0;
   });
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
+  const canCreateDeal = hasPermission('AI Deals & Offers', 'CREATE');
+  const canEditDeal = hasPermission('AI Deals & Offers', 'EDIT');
+  const canDeleteDeal = hasPermission('AI Deals & Offers', 'DELETE');
 
   const handleDragStart = (e: React.DragEvent, dealId: string) => {
+    if (!canEditDeal) return;
     e.dataTransfer.setData('dealId', dealId);
     e.dataTransfer.setData('text/plain', dealId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (!canEditDeal) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDealStageChange = async (dealId: string, targetStage: DealStage) => {
+    if (!canEditDeal) return;
     setApiDeals(prev => prev.map(d => {
       if (d.id === dealId) {
         return { ...d, stage: targetStage };
@@ -450,7 +455,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
   const handleDrop = (e: React.DragEvent, targetStage: DealStage) => {
     e.preventDefault();
     const dealId = e.dataTransfer.getData('dealId') || e.dataTransfer.getData('text/plain');
-    if (dealId && currentUser.role !== 'READ_ONLY') {
+    if (dealId && canEditDeal) {
       handleDealStageChange(dealId, targetStage);
     }
   };
@@ -662,12 +667,14 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
           
           <div className="flex items-center justify-between text-xs font-bold text-[#0B1F3A]">
             <span>Views</span>
-            <button 
-              onClick={() => setShowAddDealModal(true)}
-              className="text-[11px] text-[#155EEF] hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
-              + Add
-            </button>
+            {canCreateDeal && (
+              <button 
+                onClick={() => setShowAddDealModal(true)}
+                className="text-[11px] text-[#155EEF] hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                + Add
+              </button>
+            )}
           </div>
 
           {/* Unsaved view banner */}
@@ -860,7 +867,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
           {/* Right: Reports & Add Deal Button */}
           <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
             
-            {selectedDealIds.length > 0 && !isReadOnly && (
+            {selectedDealIds.length > 0 && canDeleteDeal && (
               <button
                 onClick={handleOpenDeleteBulk}
                 className="px-3.5 py-1.5 bg-[#E11D48] hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer animate-fadeIn"
@@ -878,7 +885,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
               </button>
             </div>
 
-            {!isReadOnly && (
+            {canCreateDeal && (
               <button
                 onClick={() => setShowAddDealModal(true)}
                 className="px-3.5 py-1.5 bg-[#0D9488] hover:bg-[#0F766E] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
@@ -908,7 +915,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                   >
                     Deselect All
                   </button>
-                  {!isReadOnly && (
+                  {canDeleteDeal && (
                     <button
                       onClick={handleOpenDeleteBulk}
                       className="px-3 py-1 rounded-lg bg-[#E11D48] hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -1088,7 +1095,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                               >
                                 Open &gt;
                               </button>
-                              {!isReadOnly && (
+                              {canDeleteDeal && (
                                 <button
                                   onClick={(e) => handleOpenDeleteSingle(deal.id, deal.address, e)}
                                   className="p-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50 hover:border-rose-300 transition-colors cursor-pointer"
@@ -1152,7 +1159,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                     {stageDeals.map((deal) => (
                       <div
                         key={deal.id}
-                        draggable={!isReadOnly}
+                        draggable={canEditDeal}
                         onDragStart={(e) => handleDragStart(e, deal.id)}
                         onClick={() => onSelectDeal(deal)}
                         className="executive-panel executive-panel-hover rounded-2xl p-3.5 cursor-pointer border border-[#E2E8F0] group relative bg-white overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
@@ -1190,7 +1197,7 @@ export const DealsPage: React.FC<DealsProps> = ({ onSelectDeal }) => {
                           <span className="font-medium truncate max-w-[110px]">{deal.realtorName}</span>
                           <div className="flex items-center gap-2">
                             <span className="font-mono">{deal.createdAt || 'Recent'}</span>
-                            {!isReadOnly && (
+                            {canDeleteDeal && (
                               <button
                                 onClick={(e) => handleOpenDeleteSingle(deal.id, deal.address, e)}
                                 className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"

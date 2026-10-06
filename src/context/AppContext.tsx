@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { 
   UserProfile, 
   UserRole, 
+  PermissionAction,
   RealtorContact, 
   Conversation, 
   PropertyDeal, 
@@ -31,6 +32,7 @@ import {
   INITIAL_NOTIFICATIONS, 
   INITIAL_AUDIT_LOGS 
 } from '../data/mockData';
+import { evaluatePermission, normalizePermissions } from '../utils/permissions';
 
 interface AppContextType {
   currentUser: UserProfile;
@@ -38,7 +40,7 @@ interface AppContextType {
   isAuthenticated: boolean;
   login: (email: string, password?: string, role?: UserRole) => Promise<void>;
   logout: () => void;
-  hasPermission: (module: string, action: string) => boolean;
+  hasPermission: (module: string, action: PermissionAction) => boolean;
 
   // User Management
   users: UserProfile[];
@@ -226,7 +228,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               avatar: (u.firstName?.[0] || 'U').toUpperCase() + (u.lastName?.[0] || 'N').toUpperCase(),
               title: u.role === 'ADMIN' ? 'Managing Director & Partner' : u.role === 'MANAGER' ? 'Head of Acquisitions' : 'Acquisition Specialist',
               status: (u.status === 'ACTIVE' ? 'Active' : 'Deactivated') as 'Active' | 'Deactivated',
-              permissions: u.permissions
+              permissions: normalizePermissions(u.permissions, u.role as UserRole)
             }));
             setUsers(mappedUsers);
           }
@@ -275,17 +277,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const json = await res.json();
           if (json.success && json.data?.user) {
             const apiUser = json.data.user;
-            // Check if permissions have changed to prevent unnecessary re-renders
-            const newPermissionsStr = JSON.stringify(apiUser.permissions || {});
+            const normalizedApiPerms = normalizePermissions(apiUser.permissions, apiUser.role as UserRole);
+            const newPermissionsStr = JSON.stringify(normalizedApiPerms);
             
             setCurrentUser(prevUser => {
               const prevPermissionsStr = JSON.stringify(prevUser.permissions || {});
               if (newPermissionsStr !== prevPermissionsStr || prevUser.role !== apiUser.role) {
                 // If they changed, update the user state silently
-                const updatedUser = {
+                const updatedUser: UserProfile = {
                   ...prevUser,
                   role: apiUser.role as UserRole,
-                  permissions: apiUser.permissions
+                  permissions: normalizedApiPerms
                 };
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser));
                 return updatedUser;
@@ -334,36 +336,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAuditAction(`Switched active view role to ${role}`, 'User Session');
   };
 
-  const hasPermission = (module: string, action: string): boolean => {
-    // Admins always have all permissions implicitly
-    if (currentUser.role === 'ADMIN') return true;
-    
-    // Check custom permissions object
-    if (currentUser.permissions && currentUser.permissions[module]) {
-      return !!currentUser.permissions[module][action];
-    }
-    
-    // Fallback: If no custom permissions, fallback to strict role-based checking
-    if (currentUser.role === 'MANAGER') {
-      if (module === 'Settings') return action === 'Show' || action === 'View'; // Managers can view settings but maybe not delete
-      return true; // Managers can do most things
-    }
-    
-    if (currentUser.role === 'AGENT') {
-      const allowed = ['Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 'Conversations', 'Task Manager', 'Contacts Directory', 'Marketing', 'Templates & Automations'];
-      if (!allowed.includes(module)) return false;
-      if (action === 'Delete') return false; // Agents can't delete by default
-      return true;
-    }
-    
-    if (currentUser.role === 'READ_ONLY') {
-      const allowed = ['Dashboard', 'Outreach Pipeline', 'AI Deals & Offers', 'Conversations', 'Contacts Directory', 'Marketing', 'Reports & Audit'];
-      if (!allowed.includes(module)) return false;
-      if (action === 'Show' || action === 'View') return true;
-      return false;
-    }
-
-    return false;
+  const hasPermission = (module: string, action: PermissionAction): boolean => {
+    return evaluatePermission(currentUser, module, action);
   };
 
   const login = async (email: string, passwordStr?: string, role: UserRole = 'ADMIN') => {
@@ -378,6 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       if (data.success && data.data) {
         const apiUser = data.data.user;
+        const normalizedPerms = normalizePermissions(data.data.permissions || apiUser.permissions, apiUser.role as UserRole);
         const mappedUser: UserProfile = {
           id: apiUser.id,
           name: `${apiUser.firstName} ${apiUser.lastName}`,
@@ -386,7 +361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           avatar: apiUser.firstName.substring(0, 2).toUpperCase(),
           title: 'Real Estate Executive',
           status: apiUser.status as 'Active' | 'Deactivated',
-          permissions: data.data.permissions || apiUser.permissions
+          permissions: normalizedPerms
         };
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);

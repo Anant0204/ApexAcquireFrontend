@@ -52,7 +52,8 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     bulkDeleteContacts, 
     bulkUpdateContacts, 
     importContacts, 
-    currentUser 
+    currentUser,
+    hasPermission
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -416,11 +417,11 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
     return <div className="p-6 text-center text-[#475569]">Loading Contacts Directory...</div>;
   }
 
-  const isAdmin = currentUser.role === 'ADMIN';
-  const isManager = currentUser.role === 'MANAGER';
-  const canCreate = isAdmin || isManager;
-  const canBulk = isAdmin || isManager;
-  const isReadOnly = currentUser.role === 'READ_ONLY';
+  const canCreate = hasPermission('Contacts Directory', 'CREATE');
+  const canEdit = hasPermission('Contacts Directory', 'EDIT');
+  const canDelete = hasPermission('Contacts Directory', 'DELETE');
+  const canBulk = canDelete;
+  const isReadOnly = !canEdit;
 
   return (
     <div className="space-y-6 max-w-full pb-12">
@@ -446,7 +447,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
         </div>
 
         <div className="flex items-center gap-3">
-          {isAdmin && (
+          {canCreate && (
             <button
               onClick={() => {
                 setShowCsvWizard(true);
@@ -715,7 +716,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
                         Profile
                       </button>
 
-                      {canCreate && (
+                      {canEdit && (
                         <button
                           onClick={() => {
                             setEditingContact(c);
@@ -746,7 +747,7 @@ export const ContactsPage: React.FC<ContactsProps> = ({ onSelectContact, onOpenC
                         </button>
                       )}
 
-                      {canCreate && (
+                      {canDelete && (
                         <button
                           onClick={() => handleArchive(c.id)}
                           className="p-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-[#E11D48] hover:bg-rose-50"

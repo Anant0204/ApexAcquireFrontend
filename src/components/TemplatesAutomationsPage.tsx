@@ -31,7 +31,8 @@ export const TemplatesAutomationsPage: React.FC = () => {
     simulateWorkflow, 
     aiConfig, 
     updateAIConfig,
-    currentUser 
+    currentUser,
+    hasPermission
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'templates' | 'workflows' | 'ai_personality'>('templates');
@@ -144,7 +145,10 @@ export const TemplatesAutomationsPage: React.FC = () => {
     }
   };
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
+  const canCreate = hasPermission('Templates & Automations', 'CREATE');
+  const canEdit = hasPermission('Templates & Automations', 'EDIT');
+  const canDelete = hasPermission('Templates & Automations', 'DELETE');
+  const isReadOnly = !canEdit;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -217,7 +221,7 @@ export const TemplatesAutomationsPage: React.FC = () => {
               ))}
             </div>
 
-            {!isReadOnly && (
+            {canCreate && (
               <button
                 onClick={() => {
                   setEditingTemplate(null);
@@ -286,7 +290,7 @@ export const TemplatesAutomationsPage: React.FC = () => {
                       {copiedId === tpl.id ? 'Copied' : 'Copy'}
                     </button>
 
-                    {!isReadOnly && (
+                    {canEdit && (
                       <button
                         onClick={() => {
                           setEditingTemplate(tpl);
@@ -304,7 +308,7 @@ export const TemplatesAutomationsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {!isReadOnly && (
+                    {canDelete && (
                       <button
                         onClick={() => deleteTemplate(tpl.id)}
                         className="p-1 rounded bg-[#F8FAFC] text-rose-500 hover:text-rose-700"

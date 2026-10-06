@@ -1,5 +1,7 @@
 export type UserRole = 'ADMIN' | 'MANAGER' | 'AGENT' | 'READ_ONLY';
 
+export type PermissionAction = 'CREATE' | 'VIEW' | 'EDIT' | 'DELETE';
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -8,7 +10,7 @@ export interface UserProfile {
   avatar: string;
   title: string;
   status: 'Active' | 'Deactivated';
-  permissions?: Record<string, Record<string, boolean>>;
+  permissions?: Record<string, Record<PermissionAction, boolean>>;
 }
 
 export type OutreachStage = 

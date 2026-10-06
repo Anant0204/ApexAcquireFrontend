@@ -38,7 +38,8 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
     cloneLeadToDeals,
     updateContactStage,
     currentUser,
-    claimLead
+    claimLead,
+    hasPermission
   } = useApp();
 
   const [messageInput, setMessageInput] = useState('');
@@ -203,7 +204,10 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
     setTimeout(() => setClonedSuccessToast(null), 4000);
   };
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
+  const canCreateMessage = hasPermission('Conversations', 'CREATE');
+  const canEditConversation = hasPermission('Conversations', 'EDIT');
+  const canCloneDeal = hasPermission('AI Deals & Offers', 'CREATE');
+  const isReadOnly = !canCreateMessage && !canEditConversation;
   const isAdmin = currentUser.role === 'ADMIN';
 
   return (
@@ -486,7 +490,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
               <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] text-[#64748B] uppercase font-bold">Qualification Score</span>
-                  {isAdmin && (
+                  {canEditConversation && (
                     <button
                       onClick={() => {
                         setOverrideGradeVal(activeConv.grade);
@@ -581,7 +585,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({ onOpenCall
       </div>
 
       {/* MANUAL GRADE OVERRIDE MODAL */}
-      {showOverrideModal && isAdmin && (
+      {showOverrideModal && canEditConversation && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="executive-panel w-full max-w-md rounded-2xl p-6 relative bg-white shadow-2xl">
             <button onClick={() => setShowOverrideModal(false)} className="absolute top-5 right-5 text-[#64748B] hover:text-[#0F172A]">

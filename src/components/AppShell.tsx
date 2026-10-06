@@ -105,17 +105,17 @@ export const AppShell: React.FC<ShellProps> = ({ children, activeTab, setActiveT
   ];
 
   const visibleNavItems = allNavItems.filter(item => {
-    // Check custom permissions for each tab
-    if (item.id === 'dashboard') return hasPermission('Dashboard', 'Show');
-    if (item.id === 'outreach') return hasPermission('Outreach Pipeline', 'Show');
-    if (item.id === 'contacts') return hasPermission('Contacts Directory', 'View') || hasPermission('Contacts Directory', 'Show');
-    if (item.id === 'deals') return hasPermission('AI Deals & Offers', 'View') || hasPermission('AI Deals & Offers', 'Show');
-    if (item.id === 'conversations') return hasPermission('Conversations', 'View') || hasPermission('Conversations', 'Show');
-    if (item.id === 'tasks') return hasPermission('Task Manager', 'View') || hasPermission('Task Manager', 'Show');
-    if (item.id === 'marketing') return hasPermission('Marketing', 'View') || hasPermission('Marketing', 'Show');
-    if (item.id === 'templates') return hasPermission('Templates & Automations', 'View') || hasPermission('Templates & Automations', 'Show');
-    if (item.id === 'reports') return hasPermission('Reports & Audit', 'Show') || hasPermission('Reports & Audit', 'View');
-    if (item.id === 'settings') return hasPermission('Settings', 'View') || hasPermission('Settings', 'Show') || hasPermission('Settings', 'Manage');
+    // Check canonical VIEW permission for each tab
+    if (item.id === 'dashboard') return hasPermission('Dashboard', 'VIEW');
+    if (item.id === 'outreach') return hasPermission('Outreach Pipeline', 'VIEW');
+    if (item.id === 'contacts') return hasPermission('Contacts Directory', 'VIEW');
+    if (item.id === 'deals') return hasPermission('AI Deals & Offers', 'VIEW');
+    if (item.id === 'conversations') return hasPermission('Conversations', 'VIEW');
+    if (item.id === 'tasks') return hasPermission('Task Manager', 'VIEW');
+    if (item.id === 'marketing') return hasPermission('Marketing', 'VIEW');
+    if (item.id === 'templates') return hasPermission('Templates & Automations', 'VIEW');
+    if (item.id === 'reports') return hasPermission('Reports & Audit', 'VIEW');
+    if (item.id === 'settings') return hasPermission('Settings', 'VIEW');
     
     return true;
   });

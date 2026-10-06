@@ -66,7 +66,8 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
     contacts,
     conversations,
     users,
-    sendMessage
+    sendMessage,
+    hasPermission
   } = useApp();
 
   const deal = deals.find(d => d.id === initialDeal.id) || initialDeal;
@@ -177,6 +178,10 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
     }
   }, [deal.id, deal.ownerId, deal.ownerName]);
 
+  const canEditDeal = hasPermission('AI Deals & Offers', 'EDIT');
+  const canDeleteDeal = hasPermission('AI Deals & Offers', 'DELETE');
+  const isReadOnly = !canEditDeal;
+
   const handleAssignTeamMember = async (u: { id: string; name: string; avatar?: string }) => {
     setCurrentOwnerId(u.id);
     setCurrentOwnerName(u.name);
@@ -223,7 +228,6 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
   const estimatedProfit = Math.max(0, arvNum - rehabNum - closingNum - holdingNum - offerPriceNum);
   const roi = offerPriceNum > 0 ? ((estimatedProfit / (offerPriceNum + rehabNum)) * 100).toFixed(1) : '0';
 
-  const isReadOnly = currentUser.role === 'READ_ONLY';
   const normStage = normalizeDealStage(deal.stage);
   const stageConfig = STAGE_CONFIG[normStage] || STAGE_CONFIG['New'];
 
@@ -494,7 +498,7 @@ export const DealDetailPage: React.FC<DealDetailPageProps> = ({
           <span className="font-mono">Deal ID: <strong className="text-[#0B1F3A]">#{deal.id}</strong></span>
           <span>&bull;</span>
           <span>Received: <strong className="text-[#0B1F3A]">{deal.createdAt || 'Today'}</strong></span>
-          {!isReadOnly && (
+          {canDeleteDeal && (
             <>
               <span>&bull;</span>
               <button
